@@ -55,16 +55,17 @@ class Dataset(torch.utils.data.Dataset):
         uniform_number_of_layers = self.transforms['uniform-number-of-layers']['bool']
 
 
-        assert limit_max_number_of_layers != uniform_number_of_layers, "Either there should be a maximum threshold or all CTs should have a uniform number of layers"
+        assert limit_max_number_of_layers != uniform_number_of_layers, "Either there should be a maximum threshold or a uniform number of layers"
 
 
-        # Open here the image by nibabel
+        # Open image by nibabel
         ct_instance = nib.load(ct_scan).get_fdata()
         
+
         # H, W, Layers -> 512 x 512 x L
         ct_instance_shape = ct_instance.shape
         ct_instance_layer_number = ct_instance_shape[2]
-        #print(" ct_instance_layer_number", ct_instance_layer_number)
+
 
         ct_instance_tensor = []
         
@@ -75,7 +76,7 @@ class Dataset(torch.utils.data.Dataset):
             if(ct_instance_layer_number > max_number_of_layers):      
 
                 # Executed in the exact order they are specified.
-                # Each image would first be clipped and then normalized.
+                # Each image would be clipped, normalized, rotated, resized, cropped
 
                 divider = 0
                 for ct_instance_layer_index in range(max_number_of_layers):
@@ -143,11 +144,14 @@ class Dataset(torch.utils.data.Dataset):
             
             return ct_instance_tensor, torch.tensor(ct_label)
 
+
         elif uniform_number_of_layers:
             divider = 0
             for ct_instance_layer_index in range(uniform_number_of_layers):
+                
                 divider += ct_instance_layer_number / uniform_number_of_layers
                 ct_instance_layer_index = int(divider) - 1
+
                 ct_instance_layer = ct_instance[:,:,ct_instance_layer_index]
                 ct_instance_layer_clipped = np.clip(ct_instance_layer, amin, amax)                    
                 ct_instance_layer_clipped_normalized = (ct_instance_layer_clipped - (lower_bound)) / ((upper_bound) - (lower_bound))
