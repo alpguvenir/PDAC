@@ -1,0 +1,9 @@
+cts.directory: /home/guevenira/Data/shared/PDAC_CT/CTs
+
+cst.label.csv: /home/guevenira/Data/shared/PDAC_CT/pseudonymised_patient_info.csv
+cts.label.problematic: /home/guevenira/Data/shared/Problematic_CTs
+
+#data.label.name: Geschlecht
+data.label.name: Befund-Verlauf
+
+data.label.balanced: True
