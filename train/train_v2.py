@@ -23,7 +23,8 @@ def get_file_paths(path):
     return glob.glob(path + "/*")
 
 
-torch.manual_seed(1)
+torch.manual_seed(2023)
+torch.cuda.manual_seed(2023)
 
 
 with open('../parameters.yml') as params:
@@ -107,12 +108,6 @@ BATCH_SIZE = 1
 lr = 0.001
 
 
-if params_dict.get("data.label.balanced"):
-    print("balanced...")
-    # If data is set to be balanced, according to which class label has more instances
-    # Shuffle the label that is in excess and train in a ratio of 1:1
-
-
 train_dataset = Dataset.Dataset(train_ct_scans_list, train_ct_labels_list, transforms=transforms)
 val_dataset = Dataset.Dataset(val_ct_scans_list, val_ct_labels_list, transforms=transforms)
 test_dataset = Dataset.Dataset(test_ct_scans_list, test_ct_labels_list, transforms=transforms)
@@ -138,7 +133,10 @@ model.to(device)
 
 
 # loss and optimizer
-criterion = nn.BCEWithLogitsLoss()
+# https://stackoverflow.com/questions/71462326/pytorch-bcewithlogitsloss-calculating-pos-weight
+# https://discuss.pytorch.org/t/bcewithlogitsloss-calculating-pos-weight/146336/2
+pos_weight = 2
+criterion = nn.BCEWithLogitsLoss(pos_weight = torch.tensor(pos_weight))
 optimizer = optim.Adam(model.parameters(), lr=lr)
 sched = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[3, 4], gamma=0.01)
 
@@ -186,7 +184,6 @@ for epoch in range(NUM_EPOCHS):
     print(f"\tMean train loss: {total_loss / len(train_loader):.2f}")
     sched.step()
     model.eval()
-
     preds, targets = [], []
     with torch.no_grad():
         for input, target in tqdm(val_loader, leave=False):
@@ -200,17 +197,14 @@ for epoch in range(NUM_EPOCHS):
             targets.append(target.flatten())
     preds, targets = torch.cat(preds), torch.cat(targets)
     acc = torchmetrics.functional.accuracy(preds, targets, task="binary")
-    mcc = torchmetrics.functional.classification.binary_matthews_corrcoef(
-        preds,
-        targets,
-    )
-    # print(f"\tLabel distribution: {Counter(targets.tolist())}")
+    mcc = torchmetrics.functional.classification.binary_matthews_corrcoef(preds, targets,)
+
     print(f"\tVal accuracy: {acc*100.0:.1f}%")
     print(f"\tVal MCC: {mcc*100.0:.1f}%")
 
     preds = (preds>0.5).float()
     metric = BinaryConfusionMatrix()
-    print(metric(preds, targets))
+    print("\t", metric(preds, targets))
 
 
     preds, targets = [], []
@@ -226,15 +220,13 @@ for epoch in range(NUM_EPOCHS):
             targets.append(target.flatten())
     preds, targets = torch.cat(preds), torch.cat(targets)
     acc = torchmetrics.functional.accuracy(preds, targets, task="binary")
-    mcc = torchmetrics.functional.classification.binary_matthews_corrcoef(
-        preds,
-        targets,
-    )
-    # print(f"\tLabel distribution: {Counter(targets.tolist())}")
+    mcc = torchmetrics.functional.classification.binary_matthews_corrcoef(preds, targets,)
+
     print(f"\tTest accuracy: {acc*100.0:.1f}%")
     print(f"\tTest MCC: {mcc*100.0:.1f}%")
 
     preds = (preds>0.5).float()
     metric = BinaryConfusionMatrix()
-    print(metric(preds, targets))
+    print("\t", metric(preds, targets))
 
+    print("\n")

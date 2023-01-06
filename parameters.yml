@@ -7,3 +7,4 @@ cts.label.problematic: /home/guevenira/Data/shared/Problematic_CTs
 data.label.name: Befund-Verlauf
 
 data.label.balanced: True
+data.label.balanced.shuffled: False
