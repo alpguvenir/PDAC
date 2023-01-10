@@ -6,6 +6,7 @@ import yaml
 import glob
 import pickle
 from tqdm import tqdm
+import random
 
 import torch
 import torch.nn as nn
@@ -16,14 +17,23 @@ from torchmetrics.classification import BinaryConfusionMatrix
 
 from dataset import Dataset
 from models.ResNet18_MultiheadAttention import ResNet18_MultiheadAttention
+from models.ResNet34_MultiheadAttention import ResNet34_MultiheadAttention
 from models.ResNet50_MultiheadAttention import ResNet50_MultiheadAttention
+from models.ResNet50_MultiheadAttention_v2 import ResNet50_MultiheadAttention_v2
+from models.ResNet50_MultiheadAttention_v3 import ResNet50_MultiheadAttention_v3
+
+from models.ResNet18_ViT import ResNet18_ViT
+from models.ResNet50_ViT import ResNet50_ViT
+
+from models.ResNet18 import ResNet18
 
 
 def get_file_paths(path):
     return glob.glob(path + "/*")
 
 
-torch.manual_seed(1)
+torch.manual_seed(2023)
+torch.cuda.manual_seed(2023)
 
 
 with open('../parameters.yml') as params:
@@ -72,6 +82,14 @@ elif params_dict.get("data.label.name") == "Geschlecht":
     val_ct_labels_list = pickle.load(file)
     file.close()
 
+    file = open("../dataset/geschlecht_v1/geschlecht_0.1_test_ct_scans_list.pickle",'rb')
+    test_ct_scans_list = pickle.load(file)
+    file.close()
+
+    file = open("../dataset/geschlecht_v1/geschlecht_0.1_test_ct_labels_list.pickle",'rb')
+    test_ct_labels_list = pickle.load(file)
+    file.close()
+
 
 print("# of 0s in train: ", train_ct_labels_list.count(0))
 print("# of 1s in train: ", train_ct_labels_list.count(1))
@@ -95,7 +113,7 @@ transforms = {
                 'Crop-Width' : {'begin': 0, 'end': 256},
 
                 'limit-max-number-of-layers' : {'bool': True},
-                'Max-Layers' : {'max': 195},
+                'Max-Layers' : {'max': 190},
                 
                 'uniform-number-of-layers' : {'bool': False},
                 'Uniform-Layers': {'uniform': 200},
@@ -111,6 +129,44 @@ if params_dict.get("data.label.balanced"):
     print("balanced...")
     # If data is set to be balanced, according to which class label has more instances
     # Shuffle the label that is in excess and train in a ratio of 1:1
+    num_of_0s = train_ct_labels_list.count(0)
+    num_of_1s = train_ct_labels_list.count(1)
+
+    balanced_count = 0
+    if num_of_0s < num_of_1s:
+        balanced_count = num_of_0s
+    else:
+        balanced_count = num_of_1s
+
+    ct_scan_list_balanced = []
+    ct_label_list_balanced = []
+
+    counter_0s = 0
+    counter_1s = 0
+
+    for i in range(0, len(train_ct_labels_list)):
+        if train_ct_labels_list[i] == 0:
+            ct_scan_list_balanced.append(train_ct_scans_list[i])
+            ct_label_list_balanced.append(train_ct_labels_list[i])
+            counter_0s += 1
+        if counter_0s == balanced_count:
+            break
+
+    for i in range(0, len(train_ct_labels_list)):
+        if train_ct_labels_list[i] == 1:
+            ct_scan_list_balanced.append(train_ct_scans_list[i])
+            ct_label_list_balanced.append(train_ct_labels_list[i])
+            counter_1s += 1
+        if counter_1s == balanced_count:
+            break
+
+    temp_ct_scan_label_list_balanced = list(zip(ct_scan_list_balanced, ct_label_list_balanced))
+    random.shuffle(temp_ct_scan_label_list_balanced)
+    ct_scan_list_balanced, ct_label_list_balanced = zip(*temp_ct_scan_label_list_balanced)
+    train_ct_scans_list, train_ct_labels_list = list(ct_scan_list_balanced), list(ct_label_list_balanced)
+    
+    print("# of 0s in train: ", train_ct_labels_list.count(0))
+    print("# of 1s in train: ", train_ct_labels_list.count(1))
 
 
 train_dataset = Dataset.Dataset(train_ct_scans_list, train_ct_labels_list, transforms=transforms)
@@ -124,7 +180,35 @@ test_loader = DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE)
 
 
 # initialize model
-model = ResNet50_MultiheadAttention()
+#model = ResNet34_MultiheadAttention()
+
+"""
+model = ResNet18_ViT(
+    dim=512,
+    num_patches=200, # change this to 200!!!!!!!!!!! TODO
+    patch_dim=512,
+    num_classes=2,
+    channels=1,
+    depth = 6,
+    heads = 16,
+    mlp_dim = 2048
+)
+"""
+
+"""
+model = ResNet50_ViT(
+    dim=2048,
+    num_patches=200, # change this to 200!!!!!!!!!!! TODO
+    patch_dim=2048,
+    num_classes=2,
+    channels=1,
+    depth = 6,
+    heads = 16,
+    mlp_dim = 2048
+)
+"""
+model = ResNet50_MultiheadAttention_v3()
+
 sigmoid = nn.Sigmoid()
 
 
@@ -147,6 +231,7 @@ for epoch in range(NUM_EPOCHS):
     print(f"Epoch: {epoch}")
     total_loss = 0
     model.train()
+
     if epoch == 0:
         model.feature_extractor.eval()
         for param in model.feature_extractor.parameters():
@@ -157,6 +242,11 @@ for epoch in range(NUM_EPOCHS):
         model.feature_extractor.eval()
     elif epoch == 2:
         pass
+        """
+        for param in model.feature_extractor.parameters():
+            if param.requires_grad == False:
+                print(param)
+        """
     elif epoch == 3:
         for param in model.feature_extractor.layer4.parameters():
             param.requires_grad = True
@@ -200,17 +290,14 @@ for epoch in range(NUM_EPOCHS):
             targets.append(target.flatten())
     preds, targets = torch.cat(preds), torch.cat(targets)
     acc = torchmetrics.functional.accuracy(preds, targets, task="binary")
-    mcc = torchmetrics.functional.classification.binary_matthews_corrcoef(
-        preds,
-        targets,
-    )
-    # print(f"\tLabel distribution: {Counter(targets.tolist())}")
+    mcc = torchmetrics.functional.classification.binary_matthews_corrcoef(preds, targets,)
+
     print(f"\tVal accuracy: {acc*100.0:.1f}%")
     print(f"\tVal MCC: {mcc*100.0:.1f}%")
 
     preds = (preds>0.5).float()
     metric = BinaryConfusionMatrix()
-    print(metric(preds, targets))
+    print('\t' + str(metric(preds, targets).cpu().detach().numpy()).replace('\n', '\n\t'))
 
 
     preds, targets = [], []
@@ -226,15 +313,13 @@ for epoch in range(NUM_EPOCHS):
             targets.append(target.flatten())
     preds, targets = torch.cat(preds), torch.cat(targets)
     acc = torchmetrics.functional.accuracy(preds, targets, task="binary")
-    mcc = torchmetrics.functional.classification.binary_matthews_corrcoef(
-        preds,
-        targets,
-    )
-    # print(f"\tLabel distribution: {Counter(targets.tolist())}")
+    mcc = torchmetrics.functional.classification.binary_matthews_corrcoef(preds, targets,)
+
     print(f"\tTest accuracy: {acc*100.0:.1f}%")
     print(f"\tTest MCC: {mcc*100.0:.1f}%")
 
     preds = (preds>0.5).float()
     metric = BinaryConfusionMatrix()
-    print(metric(preds, targets))
+    print('\t' + str(metric(preds, targets).cpu().detach().numpy()).replace('\n', '\n\t'))
 
+    print("\n")

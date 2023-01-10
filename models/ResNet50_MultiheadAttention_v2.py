@@ -1,7 +1,8 @@
+import torch
 import torch.nn as nn
 from torchvision import models
 
-class ResNet50_MultiheadAttention(nn.Module):
+class ResNet50_MultiheadAttention_v2(nn.Module):
     def __init__(self):
         super().__init__()
 
@@ -17,18 +18,13 @@ class ResNet50_MultiheadAttention(nn.Module):
                                     nn.Linear(hidden_size1, hidden_size1) if hidden_size1 != 512 else nn.Identity()
                                 )
         
-
-        # Convert a input 1 channel image to output 3 channel image -> Input [151, 1, 256, 256]
-        # ResNet conv1 is normally Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
-        # So we convert it to 
-        # (0): Conv2d(1, 3, kernel_size=(1, 1), stride=(1, 1))
-        # (1): Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+        # To convert a input 1 channel image to output 3 channel image
         feature_extractor.conv1 = nn.Sequential( nn.Conv2d(1, 3, 1), feature_extractor.conv1 )
 
         self.feature_extractor = feature_extractor
         
-        # Number of heads 8, embedding dimension 256
-        self.att = nn.MultiheadAttention(hidden_size1, 16)
+        # Number of heads 32, embedding dimension 256
+        self.att = nn.MultiheadAttention(hidden_size1, 32)
         
         # Classifier returning with only 1 unit, binary
         self.classifier = nn.Linear(hidden_size1, 1)
@@ -38,40 +34,6 @@ class ResNet50_MultiheadAttention(nn.Module):
         print(f"Classifier has {get_params(self.classifier)} params")
 
     def forward(self, x):
-
-        # [batch_size, channels, height, width]
-        """
-        xxx = self.feature_extractor.conv1(x)
-        print(xxx.shape)
-        
-        xxx = self.feature_extractor.bn1(xxx)
-        print(xxx.shape)
-
-        xxx = self.feature_extractor.relu(xxx)
-        print(xxx.shape)
-
-        xxx = self.feature_extractor.maxpool(xxx)
-        print(xxx.shape)
-
-        xxx = self.feature_extractor.layer1(xxx)
-        print(xxx.shape)
-
-        xxx = self.feature_extractor.layer2(xxx)
-        print(xxx.shape)
-
-        xxx = self.feature_extractor.layer3(xxx)
-        print(xxx.shape)
-
-        xxx = self.feature_extractor.layer4(xxx)
-        print(xxx.shape)
-
-        xxx = self.feature_extractor.avgpool(xxx)
-        print(xxx.shape)
-
-        xxx = self.feature_extractor.fc(xxx)
-        print(xxx.shape)
-        """
-        
         features = self.feature_extractor(x).unsqueeze(
             1
         )  # assuming only 1 CT at a time
@@ -87,7 +49,6 @@ class ResNet50_MultiheadAttention(nn.Module):
         #print("features.shape", features.shape)
 
         #print("att_map.shape", att_map.shape)
-        #print(torch.sum(att_map))
 
         out = self.classifier(features.squeeze(0))
         # print(out.shape)

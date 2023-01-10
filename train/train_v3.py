@@ -18,8 +18,6 @@ from dataset import Dataset
 from models.ResNet18_MultiheadAttention import ResNet18_MultiheadAttention
 from models.ResNet34_MultiheadAttention import ResNet34_MultiheadAttention
 from models.ResNet50_MultiheadAttention import ResNet50_MultiheadAttention
-from models.ResNet50_MultiheadAttention_v2 import ResNet50_MultiheadAttention_v2
-from models.ResNet50_MultiheadAttention_v3 import ResNet50_MultiheadAttention_v3
 
 
 def get_file_paths(path):
@@ -107,7 +105,7 @@ transforms = {
                 'Crop-Width' : {'begin': 0, 'end': 256},
 
                 'limit-max-number-of-layers' : {'bool': True},
-                'Max-Layers' : {'max': 190},
+                'Max-Layers' : {'max': 200},
                 
                 'uniform-number-of-layers' : {'bool': False},
                 'Uniform-Layers': {'uniform': 200},
@@ -130,7 +128,7 @@ test_loader = DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE)
 
 
 # initialize model
-model = ResNet50_MultiheadAttention_v3()
+model = ResNet34_MultiheadAttention()
 sigmoid = nn.Sigmoid()
 
 
@@ -143,15 +141,11 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 model.to(device)
 
 
-# loss and optimizer
-# https://stackoverflow.com/questions/71462326/pytorch-bcewithlogitsloss-calculating-pos-weight
-# https://discuss.pytorch.org/t/bcewithlogitsloss-calculating-pos-weight/146336/2
-# pos_weight = 2
-pos_weight = train_ct_labels_list.count(0) / train_ct_labels_list.count(1)
-criterion = nn.BCEWithLogitsLoss(pos_weight = torch.tensor(pos_weight))
+# loss and optimize
+criterion = nn.BCEWithLogitsLoss()
 optimizer = optim.Adam(model.parameters(), lr=lr)
 sched = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[3, 4], gamma=0.01)
-
+weight_raito = train_ct_labels_list.count(0) / train_ct_labels_list.count(1)
 
 for epoch in range(NUM_EPOCHS):
     print(f"Epoch: {epoch}")
@@ -188,7 +182,14 @@ for epoch in range(NUM_EPOCHS):
 
         out = model(input.to(device))
 
+        # https://medium.com/dataseries/how-to-deal-with-unbalanced-dataset-in-binary-classification-part-3-e580d8d09883
         loss = criterion(out, torch.unsqueeze(target, 0).float().to(device))
+
+        weighted_loss = (target.detach().cpu().item() * (weight_raito - 1)) + 1
+        # print(loss * weighted_loss)
+
+        loss = loss * weighted_loss
+
         loss.backward()
         optimizer.step()
         lv = loss.detach().cpu().item()

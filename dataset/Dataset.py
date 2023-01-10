@@ -52,10 +52,10 @@ class Dataset(torch.utils.data.Dataset):
         uniform_number_of_layers = self.transforms['Uniform-Layers']['uniform']
 
         limit_max_number_of_layers = self.transforms['limit-max-number-of-layers']['bool']
-        uniform_number_of_layers = self.transforms['uniform-number-of-layers']['bool']
+        set_uniform_number_of_layers = self.transforms['uniform-number-of-layers']['bool']
 
 
-        assert limit_max_number_of_layers != uniform_number_of_layers, "Either there should be a maximum threshold or a uniform number of layers"
+        assert limit_max_number_of_layers != set_uniform_number_of_layers, "Either there should be a maximum threshold or a uniform number of layers"
 
 
         # Open image by nibabel
@@ -145,7 +145,7 @@ class Dataset(torch.utils.data.Dataset):
             return ct_instance_tensor, torch.tensor(ct_label)
 
 
-        elif uniform_number_of_layers:
+        elif set_uniform_number_of_layers:
             divider = 0
             for ct_instance_layer_index in range(uniform_number_of_layers):
                 
