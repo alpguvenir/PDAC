@@ -19,19 +19,9 @@ from torchmetrics.classification import BinaryConfusionMatrix
 
 from dataset import Dataset
 from models.ResNet18_MultiheadAttention import ResNet18_MultiheadAttention
-from models.ResNet34_MultiheadAttention import ResNet34_MultiheadAttention
-from models.ResNet50_MultiheadAttention import ResNet50_MultiheadAttention
-from models.ResNet50_MultiheadAttention_v2 import ResNet50_MultiheadAttention_v2
-from models.ResNet50_MultiheadAttention_v3 import ResNet50_MultiheadAttention_v3
-
-from models.ResNet18_ViT import ResNet18_ViT
-from models.ResNet50_ViT import ResNet50_ViT
-
 from models.ResNet18_mean import ResNet18_mean
 from models.ResNet18_sum import ResNet18_sum
-from models.ResNet50_sum import ResNet50_sum
-
-from models.ResNet18_MultiheadAttention_sum import ResNet18_MultiheadAttention_sum
+from models.ResNet18_Linear import ResNet18_Linear
 
 
 def get_file_paths(path):
@@ -46,15 +36,16 @@ with open('../parameters.yml') as params:
 dt = datetime.now()
 ts = int(datetime.timestamp(dt))
 
-
-outputs_folder = "../../results/" + params_dict.get("data.label.name").replace("-", "_").lower() + "-" + str(ts)
-if not os.path.exists(outputs_folder):
-    os.makedirs(outputs_folder)
-
-
 torch.manual_seed(2023)
 torch.cuda.manual_seed(2023)
 
+NUM_EPOCHS = 10
+BATCH_SIZE = 1
+lr = 0.001
+
+outputs_folder = "../../results-train/" + params_dict.get("data.label.name").replace("-", "_").lower() + "-" + str(ts)
+if not os.path.exists(outputs_folder):
+    os.makedirs(outputs_folder)
 
 if params_dict.get("data.label.name") == "Befund-Verlauf":
     file = open("../dataset/befund_verlauf_v1/befund_verlauf_0.8_train_ct_scans_list.pickle",'rb')
@@ -106,6 +97,30 @@ elif params_dict.get("data.label.name") == "Geschlecht":
     test_ct_labels_list = pickle.load(file)
     file.close()
 
+elif params_dict.get("data.label.name") == "Befund-Verlauf-Therapie-Procedere":
+    file = open("../dataset/befund_verlauf_therapie_procedere_v1/befund_verlauf_therapie_procedere_0.8_train_ct_scans_list.pickle",'rb')
+    train_ct_scans_list = pickle.load(file)
+    file.close()
+
+    file = open("../dataset/befund_verlauf_therapie_procedere_v1/befund_verlauf_therapie_procedere_0.8_train_ct_labels_list.pickle",'rb')
+    train_ct_labels_list = pickle.load(file)
+    file.close()
+
+    file = open("../dataset/befund_verlauf_therapie_procedere_v1/befund_verlauf_therapie_procedere_0.1_val_ct_scans_list.pickle",'rb')
+    val_ct_scans_list = pickle.load(file)
+    file.close()
+
+    file = open("../dataset/befund_verlauf_therapie_procedere_v1/befund_verlauf_therapie_procedere_0.1_val_ct_labels_list.pickle",'rb')
+    val_ct_labels_list = pickle.load(file)
+    file.close()
+
+    file = open("../dataset/befund_verlauf_therapie_procedere_v1/befund_verlauf_therapie_procedere_0.1_test_ct_scans_list.pickle",'rb')
+    test_ct_scans_list = pickle.load(file)
+    file.close()
+
+    file = open("../dataset/befund_verlauf_therapie_procedere_v1/befund_verlauf_therapie_procedere_0.1_test_ct_labels_list.pickle",'rb')
+    test_ct_labels_list = pickle.load(file)
+    file.close()
 
 print("# of 0s in train: ", train_ct_labels_list.count(0))
 print("# of 1s in train: ", train_ct_labels_list.count(1))
@@ -116,32 +131,8 @@ print("# of 1s in val: ", val_ct_labels_list.count(1))
 print("# of 0s in test: ", test_ct_labels_list.count(0))
 print("# of 1s in test: ", test_ct_labels_list.count(1))
 
-
-# Transforms that need to be applied to the dataset
-transforms = {
-                'Clip': {'amin': -150, 'amax': 250},
-
-                'Normalize': {'bounds': [-150, 250]},       # Normalize values between 0 and 1
-
-                'Resize': {'height': 256, 'width': 256},    # Original CT layer sizes are 512 x 512
-
-                'Crop-Height' : {'begin': 0, 'end': 256},
-                'Crop-Width' : {'begin': 0, 'end': 256},
-
-                'limit-max-number-of-layers' : {'bool': True},
-                'Max-Layers' : {'max': 200},
-                
-                'uniform-number-of-layers' : {'bool': False},
-                'Uniform-Layers': {'uniform': 200},
-            }
-
-
-NUM_EPOCHS = 20
-BATCH_SIZE = 1
-lr = 0.001
-
-
 if params_dict.get("data.label.balanced"):
+
     print("balanced...")
     # If data is set to be balanced, according to which class label has more instances
     # Shuffle the label that is in excess and train in a ratio of 1:1
@@ -185,68 +176,52 @@ if params_dict.get("data.label.balanced"):
     print("# of 0s in train: ", train_ct_labels_list.count(0))
     print("# of 1s in train: ", train_ct_labels_list.count(1))
 
+# Transforms that need to be applied to the dataset
+transforms = {
+                'Clip': {'amin': -150, 'amax': 250},
+
+                'Normalize': {'bounds': [-150, 250]},       # Normalize values between 0 and 1
+
+                'Resize': {'height': 256, 'width': 256},    # Original CT layer sizes are 512 x 512
+
+                'Crop-Height' : {'begin': 0, 'end': 256},
+                'Crop-Width' : {'begin': 0, 'end': 256},
+
+                'limit-max-number-of-layers' : {'bool': False},
+                'Max-Layers' : {'max': 200},
+                
+                'uniform-number-of-layers' : {'bool': True},
+                'Uniform-Layers': {'uniform': 200},
+            }
 
 train_dataset = Dataset.Dataset(train_ct_scans_list, train_ct_labels_list, transforms=transforms, train_mode = True)
 val_dataset = Dataset.Dataset(val_ct_scans_list, val_ct_labels_list, transforms=transforms, train_mode = False)
 test_dataset = Dataset.Dataset(test_ct_scans_list, test_ct_labels_list, transforms=transforms, train_mode = False)
-
 
 train_loader = DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE)
 val_loader = DataLoader(dataset=val_dataset, batch_size=BATCH_SIZE)
 test_loader = DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE)
 
 
-# initialize model
-#model = ResNet34_MultiheadAttention()
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-"""
-model = ResNet18_ViT(
-    dim=512,
-    num_patches=200, # change this to 200!!!!!!!!!!! TODO
-    patch_dim=512,
-    num_classes=2,
-    channels=1,
-    depth = 6,
-    heads = 16,
-    mlp_dim = 2048
-)
-"""
 
-"""
-model = ResNet50_ViT(
-    dim=2048,
-    num_patches=200, # change this to 200!!!!!!!!!!! TODO
-    patch_dim=2048,
-    num_classes=2,
-    channels=1,
-    depth = 6,
-    heads = 16,
-    mlp_dim = 2048
-)
-"""
-model = ResNet18_MultiheadAttention_sum()
-
-sigmoid = nn.Sigmoid()
-
+model = ResNet18_MultiheadAttention()
+model.to(device)
 
 get_params = lambda m: sum(p.numel() for p in m.parameters())
 print(f"Complete model has {get_params(model)} params")
 
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-model.to(device)
-
-
 # loss and optimizer
+sigmoid = nn.Sigmoid()
 criterion = nn.BCEWithLogitsLoss()
 optimizer = optim.Adam(model.parameters(), lr=lr)
 sched = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[3, 4], gamma=0.01)
 
-
 for epoch in range(NUM_EPOCHS):
     print(f"Epoch: {epoch}")
-    total_loss = 0
+    total_train_loss = 0
     model.train()
 
     if epoch == 0:
@@ -268,72 +243,111 @@ for epoch in range(NUM_EPOCHS):
     elif epoch > 4:
         for param in model.parameters():
             param.requires_grad = True
-    
+
+
+    #### TRAIN ####
     pbar_train_loop = tqdm(train_loader, total=len(train_loader), leave=False)
     
-    for input, target in pbar_train_loop:
+    for train_input, train_target in pbar_train_loop:
         optimizer.zero_grad()
 
-        input = input.permute(2, 0, 1, 3, 4)
-        input = torch.squeeze(input, 1)
+        train_input = train_input.permute(2, 0, 1, 3, 4)
+        train_input = torch.squeeze(train_input, 1)
 
-        out = model(input.to(device))
-        loss = criterion(out, torch.unsqueeze(target, 0).float().to(device))
-        loss.backward()
+        train_output = model(train_input.to(device))
+
+        train_loss = criterion(train_output, torch.unsqueeze(train_target, 0).float().to(device))
+        train_loss.backward()
+
         optimizer.step()
-        lv = loss.detach().cpu().item()
-        total_loss += lv
-        pbar_train_loop.set_description_str(f"Loss: {lv:.2f}")
-    
-    print(f"\tMean train loss: {total_loss / len(train_loader):.2f}")
+        train_loss_value = train_loss.detach().cpu().item()
+
+        total_train_loss += train_loss_value
+
+        pbar_train_loop.set_description_str(f"Loss: {train_loss_value:.2f}")
+
+    print(f"\tMean train loss: {total_train_loss / len(train_loader):.2f}")
     sched.step()
+
+
+    #### VALIDATION ####
     model.eval()
 
-    preds, targets = [], []
+    total_validation_loss = 0
+    validation_outputs = []
+    validation_targets = []
+
     with torch.no_grad():
-        for input, target in tqdm(val_loader, leave=False):
+        for validation_input, validation_target in tqdm(val_loader, leave=False):
 
-            input = input.permute(2, 0, 1, 3, 4)
-            input = torch.squeeze(input, 1)
+            validation_input = validation_input.permute(2, 0, 1, 3, 4)
+            validation_input = torch.squeeze(validation_input, 1)
 
-            out = model(input.to(device))
+            validation_output = model(validation_input.to(device))
 
-            preds.append(sigmoid(out.cpu().flatten()))
-            targets.append(target.flatten())
-    preds, targets = torch.cat(preds), torch.cat(targets)
-    acc = torchmetrics.functional.accuracy(preds, targets, task="binary")
-    mcc = torchmetrics.functional.classification.binary_matthews_corrcoef(preds, targets,)
+            validation_loss = criterion(validation_output, torch.unsqueeze(validation_target, 0).float().to(device))
+    
+            validation_loss_value = validation_loss.detach().cpu().item()
 
-    print(f"\tVal accuracy: {acc*100.0:.1f}%")
-    print(f"\tVal MCC: {mcc*100.0:.1f}%")
+            total_validation_loss += validation_loss_value
 
-    preds = (preds>0.5).float()
+            validation_outputs.append(sigmoid(validation_output.cpu().flatten()))
+            validation_targets.append(validation_target.flatten())
+
+
+    print(f"\tMean validation loss: {total_validation_loss / len(val_loader):.2f}")
+    validation_outputs, validation_targets = torch.cat(validation_outputs), torch.cat(validation_targets)
+    
+    validation_accuracy = torchmetrics.functional.accuracy(validation_outputs, validation_targets, task="binary")
+    validation_mcc = torchmetrics.functional.classification.binary_matthews_corrcoef(validation_outputs, validation_targets)
+
+    print(f"\tValidation accuracy: {validation_accuracy*100.0:.1f}%")
+    print(f"\tValidation MCC: {validation_mcc*100.0:.1f}%")
+
+    validation_outputs = (validation_outputs>0.5).float()
     metric = BinaryConfusionMatrix()
-    print('\t' + str(metric(preds, targets).cpu().detach().numpy()).replace('\n', '\n\t'))
+    print('\t' + str(metric(validation_outputs, validation_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
 
 
-    preds, targets = [], []
+    #### TEST ####
+    model.eval()
+
+    total_test_loss = 0
+    test_outputs = []
+    test_targets = []
+
     with torch.no_grad():
-        for input, target in tqdm(test_loader, leave=False):
+        for test_input, test_target in tqdm(test_loader, leave=False):
 
-            input = input.permute(2, 0, 1, 3, 4)
-            input = torch.squeeze(input, 1)
+            test_input = test_input.permute(2, 0, 1, 3, 4)
+            test_input = torch.squeeze(test_input, 1)
 
-            out = model(input.to(device))
+            test_output = model(test_input.to(device))
 
-            preds.append(sigmoid(out.cpu().flatten()))
-            targets.append(target.flatten())
-    preds, targets = torch.cat(preds), torch.cat(targets)
-    acc = torchmetrics.functional.accuracy(preds, targets, task="binary")
-    mcc = torchmetrics.functional.classification.binary_matthews_corrcoef(preds, targets,)
+            test_loss = criterion(test_output, torch.unsqueeze(test_target, 0).float().to(device))
 
-    print(f"\tTest accuracy: {acc*100.0:.1f}%")
-    print(f"\tTest MCC: {mcc*100.0:.1f}%")
+            test_loss_value = test_loss.detach().cpu().item()
 
-    preds = (preds>0.5).float()
-    metric = BinaryConfusionMatrix()
-    print('\t' + str(metric(preds, targets).cpu().detach().numpy()).replace('\n', '\n\t'))
+            total_test_loss += test_loss_value
 
+            test_outputs.append(sigmoid(test_output.cpu().flatten()))
+            test_targets.append(test_target.flatten())
+
+    
+    print(f"\tMean test loss: {total_test_loss / len(test_loader):.2f}")
+    test_outputs, test_targets = torch.cat(test_outputs), torch.cat(test_targets)
+    
+    test_accuracy = torchmetrics.functional.accuracy(test_outputs, test_targets, task="binary")
+    test_mcc = torchmetrics.functional.classification.binary_matthews_corrcoef(test_outputs, test_targets)
+
+    print(f"\tTest accuracy: {test_accuracy*100.0:.1f}%")
+    print(f"\tTest MCC: {test_mcc*100.0:.1f}%")
+
+    test_outputs = (test_outputs>0.5).float()
+    print('\t' + str(metric(test_outputs, test_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
+
+
+    #### SAVE MODEL WEIGHTS ####
     path_model = outputs_folder + "/model" + str(epoch) + ".pth"
     torch.save(model.state_dict(), path_model)
 

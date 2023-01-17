@@ -3,7 +3,7 @@ import torch.nn as nn
 from torchvision.models import ResNet18_Weights
 from torchvision import models
 
-class ResNet18(nn.Module):
+class ResNet18_sum(nn.Module):
     def __init__(self):
         super().__init__()
 
@@ -31,5 +31,5 @@ class ResNet18(nn.Module):
         )  # assuming only 1 CT at a time
         
         #print(features.shape)
-        features = torch.mean(features, 0)
+        features = torch.sum(features, 0)
         return features

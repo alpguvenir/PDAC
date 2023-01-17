@@ -25,8 +25,8 @@ from models.ResNet50_ViT import ResNet50_ViT
 
 from models.ViViT import ViViT
 from models.ResNet18_3D_MultiheadAttention import ResNet18_3D_MultiheadAttention
-from models.ResNet18_3D import ResNet18_3D
 
+from models.S3D import S3D
 
 def get_file_paths(path):
     return glob.glob(path + "/*")
@@ -180,7 +180,7 @@ test_loader = DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE)
 
 
 # initialize model
-model = ResNet18_3D()
+model = S3D()
 
 sigmoid = nn.Sigmoid()
 
@@ -193,10 +193,9 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 model.to(device)
 
-#print(model)
-
 # loss and optimizer
-criterion = nn.BCEWithLogitsLoss()
+pos_weight = train_ct_labels_list.count(1) / train_ct_labels_list.count(0)
+criterion = nn.BCEWithLogitsLoss(pos_weight = torch.tensor(pos_weight))
 optimizer = optim.Adam(model.parameters(), lr=lr)
 sched = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[3, 4], gamma=0.01)
 
@@ -206,39 +205,23 @@ for epoch in range(NUM_EPOCHS):
     total_loss = 0
     model.train()
 
-    
+
     if epoch == 0:
         model.feature_extractor.eval()
         for param in model.feature_extractor.parameters():
             param.requires_grad = False
-        model.feature_extractor.stem[0].weight.requires_grad = True
-        model.feature_extractor.stem[0].bias.requires_grad = True
-    elif epoch == 1:
-        pass
-    elif epoch == 3:
-        for param in model.feature_extractor.layer4.parameters():
-            param.requires_grad = True
-    elif epoch == 4:
-        for param in model.feature_extractor.layer3.parameters():
-            param.requires_grad = True
-    elif epoch > 4:
-        for param in model.parameters():
-            param.requires_grad = True
-    
+        model.feature_extractor.features[0][0][0].weight.requires_grad = True
+        model.feature_extractor.features[0][0][0].bias.requires_grad = True
+
     
     pbar_train_loop = tqdm(train_loader, total=len(train_loader), leave=False)
     
     for input, target in pbar_train_loop:
         optimizer.zero_grad()
 
-        #print(input.shape)
-        
         input = input.to(device)   
-        #input = torch.randn(1, 1, 200, 256, 256).to(torch.float)
 
         out = model(input.to(device))
-        
-        #print(out.shape)
 
         loss = criterion(out, torch.unsqueeze(target, 0).float().to(device))
         loss.backward()

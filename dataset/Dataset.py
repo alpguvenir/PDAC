@@ -1,7 +1,10 @@
 import json
 import os
+import yaml
+import random
 
 import torch
+import torchvision.transforms.functional as TF
 import numpy as np
 from matplotlib import pyplot as plt
 
@@ -15,18 +18,26 @@ from typing import Any, Type
 
 class Dataset(torch.utils.data.Dataset):
 
-    def __init__(self, ct_scans: list[str], ct_labels: list[str], transforms: dict = None, scan_type: Type[Any] = np.float32, label_type: Type[Any] = np.int64):
+    def __init__(self, ct_scans: list[str], ct_labels: list[str], transforms: dict = None, train_mode = False, scan_type: Type[Any] = np.float32, label_type: Type[Any] = np.int64):
 
         self.ct_scans = ct_scans
         self.ct_labels = ct_labels
 
         self.transforms = transforms
+        self.train_mode = train_mode
+
         self.scan_type = scan_type
         self.label_type = label_type
+
+        with open('../parameters.yml') as params:
+            params_dict = yaml.safe_load(params)
+        
+        self.params_dict = params_dict
 
 
     def __len__(self) -> int:
         return len(self.ct_scans)
+
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
         ct_scan, ct_label = (
@@ -67,8 +78,22 @@ class Dataset(torch.utils.data.Dataset):
         ct_instance_layer_number = ct_instance_shape[2]
 
 
+        horizontal_flip_prob = random.random()
+        horizontal_flip_threshold = self.params_dict.get("data.augmentation.horizontal_flip_threshold")
+
+        translation_prob = random.random()
+        translation_threshold = self.params_dict.get("data.augmentation.translation_threshold")
+
+        # Transformation matrix for translation
+        horizontal_shift = random.randint(-5, 5)
+        vertical_shift = random.randint(-5, 5)
+
+        M = np.float32([[1, 0, horizontal_shift],     # Horizontal shift, - to left and + to right
+                        [0, 1, vertical_shift],   # Vertical shift, + to bottom and - to top
+                        [0, 0, 1]])
+
+
         ct_instance_tensor = []
-        
 
         if limit_max_number_of_layers:
 
@@ -111,6 +136,15 @@ class Dataset(torch.utils.data.Dataset):
                     ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized[crop_height_begin:crop_height_end, crop_width_begin:crop_width_end]
 
 
+                    if self.train_mode and self.params_dict.get("data.augmentation"):
+
+                        if horizontal_flip_prob > horizontal_flip_threshold:
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.flip(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1)
+                        
+                        if translation_prob > translation_threshold:
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.warpPerspective(ct_instance_layer_clipped_normalized_rotated_resized_cropped, M, 
+                                                                                                            (ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[0], ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[1]))
+
                     if ct_instance_tensor == []:
                         ct_instance_tensor = torch.tensor(ct_instance_layer_clipped_normalized_rotated_resized_cropped.copy(), dtype=torch.float)
                         ct_instance_tensor = torch.unsqueeze(ct_instance_tensor, 0)
@@ -130,6 +164,15 @@ class Dataset(torch.utils.data.Dataset):
                     ct_instance_layer_clipped_normalized_rotated_resized = cv2.resize(ct_instance_layer_clipped_normalized_rotated, dsize=(height, width), interpolation=cv2.INTER_CUBIC)
                     ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized[crop_height_begin:crop_height_end, crop_width_begin:crop_width_end]
 
+                    if self.train_mode and self.params_dict.get("data.augmentation"):
+
+                        if horizontal_flip_prob > horizontal_flip_threshold:
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.flip(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1)
+                        
+                        if translation_prob > translation_threshold:
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.warpPerspective(ct_instance_layer_clipped_normalized_rotated_resized_cropped, M, 
+                                                                                                           (ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[0], ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[1]))
+
                     if ct_instance_tensor == []:
                         ct_instance_tensor = torch.tensor(ct_instance_layer_clipped_normalized_rotated_resized_cropped.copy(), dtype=torch.float)
                         ct_instance_tensor = torch.unsqueeze(ct_instance_tensor, 0)
@@ -138,13 +181,11 @@ class Dataset(torch.utils.data.Dataset):
                         ct_instance_tensor_new_layer = torch.unsqueeze(ct_instance_tensor_new_layer, 0)
                         ct_instance_tensor = torch.cat((ct_instance_tensor, ct_instance_tensor_new_layer), 0)
 
-            
-            ct_instance_tensor = torch.unsqueeze(ct_instance_tensor, 0)
-            #print(ct_instance_tensor.shape)
-            
+            ct_instance_tensor = torch.unsqueeze(ct_instance_tensor, 0)            
             return ct_instance_tensor, torch.tensor(ct_label)
 
 
+        # Setting all CTs to same number of layers
         elif set_uniform_number_of_layers:
             divider = 0
             for ct_instance_layer_index in range(uniform_number_of_layers):
@@ -159,6 +200,15 @@ class Dataset(torch.utils.data.Dataset):
                 ct_instance_layer_clipped_normalized_rotated_resized = cv2.resize(ct_instance_layer_clipped_normalized_rotated, dsize=(height, width), interpolation=cv2.INTER_CUBIC)
                 ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized[crop_height_begin:crop_height_end, crop_width_begin:crop_width_end]
 
+                if self.train_mode and self.params_dict.get("data.augmentation"):
+
+                    if horizontal_flip_prob > horizontal_flip_threshold:
+                        ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.flip(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1)
+                    
+                    if translation_prob > translation_threshold:
+                        ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.warpPerspective(ct_instance_layer_clipped_normalized_rotated_resized_cropped, M, 
+                                                                                                           (ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[0], ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[1]))
+
                 if ct_instance_tensor == []:
                     ct_instance_tensor = torch.tensor(ct_instance_layer_clipped_normalized_rotated_resized_cropped.copy(), dtype=torch.float)
                     ct_instance_tensor = torch.unsqueeze(ct_instance_tensor, 0)
@@ -168,6 +218,4 @@ class Dataset(torch.utils.data.Dataset):
                     ct_instance_tensor = torch.cat((ct_instance_tensor, ct_instance_tensor_new_layer), 0)
         
             ct_instance_tensor = torch.unsqueeze(ct_instance_tensor, 0)
-            #print(ct_instance_tensor.shape)
-            
             return ct_instance_tensor, torch.tensor(ct_label)

@@ -5,6 +5,11 @@ cts.label.problematic: /home/guevenira/Data/shared/Problematic_CTs
 
 data.label.name: Geschlecht
 #data.label.name: Befund-Verlauf
+#data.label.name: Befund-Verlauf-Therapie-Procedere
 
 data.label.balanced: False
 data.label.balanced.shuffled: False
+
+data.augmentation: True
+data.augmentation.horizontal_flip_threshold: 1
+data.augmentation.translation_threshold: 0.5

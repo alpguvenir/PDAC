@@ -42,4 +42,4 @@ class ResNet18_MultiheadAttention(nn.Module):
         out = self.classifier(features.squeeze(0))
         # print(out.shape)
         
-        return out
+        return out, att_map

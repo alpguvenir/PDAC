@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torchvision import models
 
-class ResNet18_3D_MultiheadAttention(nn.Module):
+class ResNet18_3D(nn.Module):
 
     def __init__(self):
         super().__init__()
@@ -26,11 +26,9 @@ class ResNet18_3D_MultiheadAttention(nn.Module):
         )
 
         self.feature_extractor = feature_extractor
-        self.att = nn.MultiheadAttention(hidden_size1, 8)
         self.classifier = nn.Linear(hidden_size1, 1)
         
         print(f"Feature extractor has {get_params(self.feature_extractor)} params")
-        print(f"Attention has {get_params(self.att)} params")
         print(f"Classifier has {get_params(self.classifier)} params")
 
     def forward(self, x):

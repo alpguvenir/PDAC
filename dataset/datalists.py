@@ -65,13 +65,29 @@ for ct_file_path in ct_files_path:
                     ct_scans_list.append(ct_file_path)
                     ct_labels_list.append(1)
 
+            # Befund Verlauf
+            # Where Therapie-Procedere == 1 or 2
+            # 207 - 0 instances
+            # 84 -  1 isntances
+            elif(params_dict.get("data.label.name") == "Befund-Verlauf-Therapie-Procedere"):
+                if str(ct_labels_df.loc[ct_index]["Befund Verlauf"]) in ['SD', 'PR', 'RD', 'SD-RD']:
+                    if str(ct_labels_df.loc[ct_index]["Therapie-Procedere"]) in ["1", "2"]:
+                        ct_scans_list.append(ct_file_path)
+                        ct_labels_list.append(0)
+                elif str(ct_labels_df.loc[ct_index]["Befund Verlauf"]) in ['PD', 'PD (MRT keine Leberläsionen)']:
+                    if str(ct_labels_df.loc[ct_index]["Therapie-Procedere"]) in ["1", "2"]:
+                        ct_scans_list.append(ct_file_path)
+                        ct_labels_list.append(1)
 
+
+# https://www.geeksforgeeks.org/python-shuffle-two-lists-with-same-order/
 temp_ct_scans_labels_list = list(zip(ct_scans_list, ct_labels_list))
 random.shuffle(temp_ct_scans_labels_list)
 
 
 ct_scans_list, ct_labels_list = zip(*temp_ct_scans_labels_list)
 ct_scans_list, ct_labels_list = list(ct_scans_list), list(ct_labels_list)
+
 
 # num_of_0s = ct_labels_list.count(0)
 # num_of_1s = ct_labels_list.count(1)

@@ -199,6 +199,7 @@ model.to(device)
 criterion = nn.BCEWithLogitsLoss()
 optimizer = optim.Adam(model.parameters(), lr=lr)
 sched = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[3, 4], gamma=0.01)
+weight_raito = train_ct_labels_list.count(0) / train_ct_labels_list.count(1)
 
 
 for epoch in range(NUM_EPOCHS):
@@ -237,6 +238,11 @@ for epoch in range(NUM_EPOCHS):
         #input = torch.randn(1, 1, 200, 256, 256).to(torch.float)
 
         out = model(input.to(device))
+
+        # https://medium.com/dataseries/how-to-deal-with-unbalanced-dataset-in-binary-classification-part-3-e580d8d09883
+        loss = criterion(out, torch.unsqueeze(target, 0).float().to(device))
+
+        weighted_loss = (target.detach().cpu().item() * (weight_raito - 1)) + 1
         
         #print(out.shape)
 

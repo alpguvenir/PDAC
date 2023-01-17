@@ -6,6 +6,8 @@ import yaml
 import glob
 import pickle
 from tqdm import tqdm
+import os
+from datetime import datetime
 
 import torch
 import torch.nn as nn
@@ -21,17 +23,32 @@ from models.ResNet50_MultiheadAttention import ResNet50_MultiheadAttention
 from models.ResNet50_MultiheadAttention_v2 import ResNet50_MultiheadAttention_v2
 from models.ResNet50_MultiheadAttention_v3 import ResNet50_MultiheadAttention_v3
 
+from models.ResNet18_sum import ResNet18_sum
+from models.ResNet50_sum import ResNet50_sum
+
+from models.ResNet18_MultiheadAttention_sum import ResNet18_MultiheadAttention_sum
+from models.ResNet50_MultiheadAttention_sum import ResNet50_MultiheadAttention_sum
 
 def get_file_paths(path):
     return glob.glob(path + "/*")
 
 
-torch.manual_seed(2023)
-torch.cuda.manual_seed(2023)
-
-
 with open('../parameters.yml') as params:
     params_dict = yaml.safe_load(params)
+
+
+# Getting the current date and time
+dt = datetime.now()
+ts = int(datetime.timestamp(dt))
+
+
+outputs_folder = "../../results/" + params_dict.get("data.label.name").replace("-", "_").lower() + "-" + str(ts)
+if not os.path.exists(outputs_folder):
+    os.makedirs(outputs_folder)
+
+
+torch.manual_seed(2023)
+torch.cuda.manual_seed(2023)
 
 
 if params_dict.get("data.label.name") == "Befund-Verlauf":
@@ -107,7 +124,7 @@ transforms = {
                 'Crop-Width' : {'begin': 0, 'end': 256},
 
                 'limit-max-number-of-layers' : {'bool': True},
-                'Max-Layers' : {'max': 190},
+                'Max-Layers' : {'max': 200},
                 
                 'uniform-number-of-layers' : {'bool': False},
                 'Uniform-Layers': {'uniform': 200},
@@ -117,9 +134,9 @@ transforms = {
 NUM_EPOCHS = 20
 BATCH_SIZE = 1
 lr = 0.001
+weight_decay=0.001
 
-
-train_dataset = Dataset.Dataset(train_ct_scans_list, train_ct_labels_list, transforms=transforms)
+train_dataset = Dataset.Dataset(train_ct_scans_list, train_ct_labels_list, transforms=transforms, train_mode = True)
 val_dataset = Dataset.Dataset(val_ct_scans_list, val_ct_labels_list, transforms=transforms)
 test_dataset = Dataset.Dataset(test_ct_scans_list, test_ct_labels_list, transforms=transforms)
 
@@ -130,7 +147,7 @@ test_loader = DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE)
 
 
 # initialize model
-model = ResNet50_MultiheadAttention_v3()
+model = ResNet18_MultiheadAttention_sum()
 sigmoid = nn.Sigmoid()
 
 
@@ -147,9 +164,10 @@ model.to(device)
 # https://stackoverflow.com/questions/71462326/pytorch-bcewithlogitsloss-calculating-pos-weight
 # https://discuss.pytorch.org/t/bcewithlogitsloss-calculating-pos-weight/146336/2
 # pos_weight = 2
-pos_weight = train_ct_labels_list.count(0) / train_ct_labels_list.count(1)
+pos_weight_multiplier = 0.85
+pos_weight = (train_ct_labels_list.count(0) / train_ct_labels_list.count(1)) * pos_weight_multiplier
 criterion = nn.BCEWithLogitsLoss(pos_weight = torch.tensor(pos_weight))
-optimizer = optim.Adam(model.parameters(), lr=lr)
+optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 sched = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[3, 4], gamma=0.01)
 
 
@@ -243,5 +261,8 @@ for epoch in range(NUM_EPOCHS):
     preds = (preds>0.5).float()
     metric = BinaryConfusionMatrix()
     print('\t' + str(metric(preds, targets).cpu().detach().numpy()).replace('\n', '\n\t'))
+
+    path_model = outputs_folder + "/model" + str(epoch) + ".pth"
+    torch.save(model.state_dict(), path_model)
 
     print("\n")
