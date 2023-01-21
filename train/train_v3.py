@@ -15,9 +15,9 @@ import torchmetrics
 from torchmetrics.classification import BinaryConfusionMatrix
 
 from dataset import Dataset
-from models.ResNet18_MultiheadAttention import ResNet18_MultiheadAttention
-from models.ResNet34_MultiheadAttention import ResNet34_MultiheadAttention
-from models.ResNet50_MultiheadAttention import ResNet50_MultiheadAttention
+from models.ResNet18.ResNet18_MultiheadAttention import ResNet18_MultiheadAttention
+from models.ResNet34.ResNet34_MultiheadAttention import ResNet34_MultiheadAttention
+from models.ResNet50.ResNet50_MultiheadAttention import ResNet50_MultiheadAttention
 
 
 def get_file_paths(path):

@@ -17,17 +17,17 @@ import torchmetrics
 from torchmetrics.classification import BinaryConfusionMatrix
 
 from dataset import Dataset
-from models.ResNet18_MultiheadAttention import ResNet18_MultiheadAttention
-from models.ResNet34_MultiheadAttention import ResNet34_MultiheadAttention
-from models.ResNet50_MultiheadAttention import ResNet50_MultiheadAttention
-from models.ResNet50_MultiheadAttention_v2 import ResNet50_MultiheadAttention_v2
-from models.ResNet50_MultiheadAttention_v3 import ResNet50_MultiheadAttention_v3
+from models.ResNet18.ResNet18_MultiheadAttention import ResNet18_MultiheadAttention
+from models.ResNet34.ResNet34_MultiheadAttention import ResNet34_MultiheadAttention
+from models.ResNet50.ResNet50_MultiheadAttention import ResNet50_MultiheadAttention
+from models.ResNet50.ResNet50_MultiheadAttention_v2 import ResNet50_MultiheadAttention_v2
+from models.ResNet50.ResNet50_MultiheadAttention_v3 import ResNet50_MultiheadAttention_v3
 
-from models.ResNet18_sum import ResNet18_sum
-from models.ResNet50_sum import ResNet50_sum
+from models.ResNet18.ResNet18_sum import ResNet18_sum
+from models.ResNet50.ResNet50_sum import ResNet50_sum
 
-from models.ResNet18_MultiheadAttention_sum import ResNet18_MultiheadAttention_sum
-from models.ResNet50_MultiheadAttention_sum import ResNet50_MultiheadAttention_sum
+from models.ResNet18.ResNet18_MultiheadAttention_sum import ResNet18_MultiheadAttention_sum
+from models.ResNet50.ResNet50_MultiheadAttention_sum import ResNet50_MultiheadAttention_sum
 
 def get_file_paths(path):
     return glob.glob(path + "/*")

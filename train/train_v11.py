@@ -18,10 +18,10 @@ import torchmetrics
 from torchmetrics.classification import BinaryConfusionMatrix
 
 from dataset import Dataset
-from models.ResNet18_MultiheadAttention import ResNet18_MultiheadAttention
-from models.ResNet18_mean import ResNet18_mean
-from models.ResNet18_sum import ResNet18_sum
-from models.ResNet18_Linear import ResNet18_Linear
+from models.ResNet18.ResNet18_MultiheadAttention import ResNet18_MultiheadAttention
+from models.ResNet18.ResNet18_mean import ResNet18_mean
+from models.ResNet18.ResNet18_sum import ResNet18_sum
+from models.ResNet18.ResNet18_Linear import ResNet18_Linear
 
 
 def get_file_paths(path):
@@ -206,7 +206,7 @@ test_loader = DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
-model = ResNet18_Linear()
+model = ResNet18_MultiheadAttention()
 model.to(device)
 
 get_params = lambda m: sum(p.numel() for p in m.parameters())

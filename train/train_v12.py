@@ -19,9 +19,19 @@ from torchmetrics.classification import BinaryConfusionMatrix
 
 from dataset import Dataset
 from models.ResNet18.ResNet18_MultiheadAttention import ResNet18_MultiheadAttention
-from models.ResNet18.ResNet18_mean import ResNet18_mean
+from models.ResNet18.ResNet18_MultiheadAttention_stats_False import ResNet18_MultiheadAttention_stats_False
 from models.ResNet18.ResNet18_sum import ResNet18_sum
+from models.ResNet18.ResNet18_mean import ResNet18_mean
 from models.ResNet18.ResNet18_Linear import ResNet18_Linear
+
+from models.ResNet50.ResNet50_MultiheadAttention import ResNet50_MultiheadAttention
+from models.ResNet50.ResNet50_sum import ResNet50_sum
+
+from models.ResNet101.ResNet101_MultiheadAttention import ResNet101_MultiheadAttention
+from models.ResNet101.ResNet101_sum import ResNet101_sum
+
+from models.ResNet152.ResNet152_MultiheadAttention import ResNet152_MultiheadAttention
+
 
 
 def get_file_paths(path):
@@ -36,91 +46,98 @@ with open('../parameters.yml') as params:
 dt = datetime.now()
 ts = int(datetime.timestamp(dt))
 
+
 torch.manual_seed(2023)
 torch.cuda.manual_seed(2023)
 
-NUM_EPOCHS = 10
+
+NUM_EPOCHS = 50
 BATCH_SIZE = 1
 lr = 0.001
+
 
 outputs_folder = "../../results-train/" + params_dict.get("data.label.name").replace("-", "_").lower() + "-" + str(ts)
 if not os.path.exists(outputs_folder):
     os.makedirs(outputs_folder)
 
 if params_dict.get("data.label.name") == "Befund-Verlauf":
-    file = open("../dataset/befund_verlauf_v1/befund_verlauf_0.8_train_ct_scans_list.pickle",'rb')
+    file = open("../dataset/" + params_dict.get("data.label.name.version") + "/befund_verlauf_0.8_train_ct_scans_list.pickle",'rb')
     train_ct_scans_list = pickle.load(file)
     file.close()
 
-    file = open("../dataset/befund_verlauf_v1/befund_verlauf_0.8_train_ct_labels_list.pickle",'rb')
+    file = open("../dataset/" + params_dict.get("data.label.name.version") + "/befund_verlauf_0.8_train_ct_labels_list.pickle",'rb')
     train_ct_labels_list = pickle.load(file)
     file.close()
 
-    file = open("../dataset/befund_verlauf_v1/befund_verlauf_0.1_val_ct_scans_list.pickle",'rb')
+    file = open("../dataset/" + params_dict.get("data.label.name.version") + "/befund_verlauf_0.1_val_ct_scans_list.pickle",'rb')
     val_ct_scans_list = pickle.load(file)
     file.close()
 
-    file = open("../dataset/befund_verlauf_v1/befund_verlauf_0.1_val_ct_labels_list.pickle",'rb')
+    file = open("../dataset/" + params_dict.get("data.label.name.version") + "/befund_verlauf_0.1_val_ct_labels_list.pickle",'rb')
     val_ct_labels_list = pickle.load(file)
     file.close()
 
-    file = open("../dataset/befund_verlauf_v1/befund_verlauf_0.1_test_ct_scans_list.pickle",'rb')
+    file = open("../dataset/" + params_dict.get("data.label.name.version") + "/befund_verlauf_0.1_test_ct_scans_list.pickle",'rb')
     test_ct_scans_list = pickle.load(file)
     file.close()
 
-    file = open("../dataset/befund_verlauf_v1/befund_verlauf_0.1_test_ct_labels_list.pickle",'rb')
+    file = open("../dataset/" + params_dict.get("data.label.name.version") + "/befund_verlauf_0.1_test_ct_labels_list.pickle",'rb')
     test_ct_labels_list = pickle.load(file)
     file.close()
 
 elif params_dict.get("data.label.name") == "Geschlecht":
-    file = open("../dataset/geschlecht_v1/geschlecht_0.8_train_ct_scans_list.pickle",'rb')
+    file = open("../dataset/" + params_dict.get("data.label.name.version") + "/geschlecht_0.8_train_ct_scans_list.pickle",'rb')
     train_ct_scans_list = pickle.load(file)
     file.close()
 
-    file = open("../dataset/geschlecht_v1/geschlecht_0.8_train_ct_labels_list.pickle",'rb')
+    file = open("../dataset/" + params_dict.get("data.label.name.version") + "/geschlecht_0.8_train_ct_labels_list.pickle",'rb')
     train_ct_labels_list = pickle.load(file)
     file.close()
 
-    file = open("../dataset/geschlecht_v1/geschlecht_0.1_val_ct_scans_list.pickle",'rb')
+    file = open("../dataset/" + params_dict.get("data.label.name.version") + "/geschlecht_0.1_val_ct_scans_list.pickle",'rb')
     val_ct_scans_list = pickle.load(file)
     file.close()
 
-    file = open("../dataset/geschlecht_v1/geschlecht_0.1_val_ct_labels_list.pickle",'rb')
+    file = open("../dataset/" + params_dict.get("data.label.name.version") + "/geschlecht_0.1_val_ct_labels_list.pickle",'rb')
     val_ct_labels_list = pickle.load(file)
     file.close()
 
-    file = open("../dataset/geschlecht_v1/geschlecht_0.1_test_ct_scans_list.pickle",'rb')
+    file = open("../dataset/" + params_dict.get("data.label.name.version") + "/geschlecht_0.1_test_ct_scans_list.pickle",'rb')
     test_ct_scans_list = pickle.load(file)
     file.close()
 
-    file = open("../dataset/geschlecht_v1/geschlecht_0.1_test_ct_labels_list.pickle",'rb')
+    file = open("../dataset/" + params_dict.get("data.label.name.version") + "/geschlecht_0.1_test_ct_labels_list.pickle",'rb')
     test_ct_labels_list = pickle.load(file)
     file.close()
 
 elif params_dict.get("data.label.name") == "Befund-Verlauf-Therapie-Procedere":
-    file = open("../dataset/befund_verlauf_therapie_procedere_v1/befund_verlauf_therapie_procedere_0.8_train_ct_scans_list.pickle",'rb')
+    file = open("../dataset/" + params_dict.get("data.label.name.version") + "/befund_verlauf_therapie_procedere_0.8_train_ct_scans_list.pickle",'rb')
     train_ct_scans_list = pickle.load(file)
     file.close()
 
-    file = open("../dataset/befund_verlauf_therapie_procedere_v1/befund_verlauf_therapie_procedere_0.8_train_ct_labels_list.pickle",'rb')
+    file = open("../dataset/" + params_dict.get("data.label.name.version") + "/befund_verlauf_therapie_procedere_0.8_train_ct_labels_list.pickle",'rb')
     train_ct_labels_list = pickle.load(file)
     file.close()
 
-    file = open("../dataset/befund_verlauf_therapie_procedere_v1/befund_verlauf_therapie_procedere_0.1_val_ct_scans_list.pickle",'rb')
+    file = open("../dataset/" + params_dict.get("data.label.name.version") + "/befund_verlauf_therapie_procedere_0.1_val_ct_scans_list.pickle",'rb')
     val_ct_scans_list = pickle.load(file)
     file.close()
 
-    file = open("../dataset/befund_verlauf_therapie_procedere_v1/befund_verlauf_therapie_procedere_0.1_val_ct_labels_list.pickle",'rb')
+    file = open("../dataset/" + params_dict.get("data.label.name.version") + "/befund_verlauf_therapie_procedere_0.1_val_ct_labels_list.pickle",'rb')
     val_ct_labels_list = pickle.load(file)
     file.close()
 
-    file = open("../dataset/befund_verlauf_therapie_procedere_v1/befund_verlauf_therapie_procedere_0.1_test_ct_scans_list.pickle",'rb')
+    file = open("../dataset/" + params_dict.get("data.label.name.version") + "/befund_verlauf_therapie_procedere_0.1_test_ct_scans_list.pickle",'rb')
     test_ct_scans_list = pickle.load(file)
     file.close()
 
-    file = open("../dataset/befund_verlauf_therapie_procedere_v1/befund_verlauf_therapie_procedere_0.1_test_ct_labels_list.pickle",'rb')
+    file = open("../dataset/" + params_dict.get("data.label.name.version") + "/befund_verlauf_therapie_procedere_0.1_test_ct_labels_list.pickle",'rb')
     test_ct_labels_list = pickle.load(file)
     file.close()
+
+
+print("Class label", params_dict.get("data.label.name"))
+print("Class shuffle version", params_dict.get("data.label.name.version"))
 
 print("# of 0s in train: ", train_ct_labels_list.count(0))
 print("# of 1s in train: ", train_ct_labels_list.count(1))
@@ -184,18 +201,23 @@ transforms = {
 
                 'Resize': {'height': 256, 'width': 256},    # Original CT layer sizes are 512 x 512
 
-                'Crop-Height' : {'begin': 0, 'end': 256},
-                'Crop-Width' : {'begin': 0, 'end': 256},
+                'Crop-Height' : {'begin': 16, 'end': 240},
+                'Crop-Width' : {'begin': 16, 'end': 240},
 
-                'limit-max-number-of-layers' : {'bool': False},
-                'Max-Layers' : {'max': 200},
+                'limit-max-number-of-layers' : {'bool': True},
+                'Max-Layers' : {'max': 100},
                 
                 'uniform-number-of-layers' : {'bool': False},
-                'Uniform-Layers' : {'uniform': 200},
+                'Uniform-Layers': {'uniform': 200},
 
-                'zero-pad-number-of-layers' : {'bool': True},
+                'zero-pad-number-of-layers' : {'bool': False},
                 'Zero-Pad-Layers' : {'zeropad': 200},
             }
+
+# FIXME when training only on train instances or train + validation instances
+train_ct_scans_list = train_ct_scans_list + val_ct_scans_list
+train_ct_labels_list = train_ct_labels_list + val_ct_labels_list
+# FIXME 
 
 train_dataset = Dataset.Dataset(train_ct_scans_list, train_ct_labels_list, transforms=transforms, train_mode = True)
 val_dataset = Dataset.Dataset(val_ct_scans_list, val_ct_labels_list, transforms=transforms, train_mode = False)
@@ -206,11 +228,11 @@ val_loader = DataLoader(dataset=val_dataset, batch_size=BATCH_SIZE)
 test_loader = DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE)
 
 
+
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-
-model = ResNet18_MultiheadAttention()
+model = ResNet152_MultiheadAttention()
 model.to(device)
+
 
 get_params = lambda m: sum(p.numel() for p in m.parameters())
 print(f"Complete model has {get_params(model)} params")
@@ -218,7 +240,15 @@ print(f"Complete model has {get_params(model)} params")
 
 # loss and optimizer
 sigmoid = nn.Sigmoid()
-criterion = nn.BCEWithLogitsLoss()
+metric = BinaryConfusionMatrix()
+
+# FIXME when training with pos_weight or not
+pos_weight_multiplier = 1
+pos_weight = (train_ct_labels_list.count(0) / train_ct_labels_list.count(1)) * pos_weight_multiplier
+criterion = nn.BCEWithLogitsLoss(pos_weight = torch.tensor(pos_weight))
+# FIXME 
+#criterion = nn.BCEWithLogitsLoss()
+
 optimizer = optim.Adam(model.parameters(), lr=lr)
 sched = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[3, 4], gamma=0.01)
 
@@ -227,6 +257,7 @@ for epoch in range(NUM_EPOCHS):
     total_train_loss = 0
     model.train()
 
+    
     if epoch == 0:
         model.feature_extractor.eval()
         for param in model.feature_extractor.parameters():
@@ -246,11 +277,14 @@ for epoch in range(NUM_EPOCHS):
     elif epoch > 4:
         for param in model.parameters():
             param.requires_grad = True
-
+    
 
     #### TRAIN ####
     pbar_train_loop = tqdm(train_loader, total=len(train_loader), leave=False)
-    
+
+    train_outputs= []
+    train_targets= []
+
     for train_input, train_target in pbar_train_loop:
         optimizer.zero_grad()
 
@@ -269,8 +303,23 @@ for epoch in range(NUM_EPOCHS):
 
         pbar_train_loop.set_description_str(f"Loss: {train_loss_value:.2f}")
 
+        train_outputs.append(sigmoid(train_output.cpu().flatten()))
+        train_targets.append(train_target.flatten())
+
     print(f"\tMean train loss: {total_train_loss / len(train_loader):.2f}")
     sched.step()
+
+    train_outputs, train_targets = torch.cat(train_outputs), torch.cat(train_targets)
+    
+    train_accuracy = torchmetrics.functional.accuracy(train_outputs, train_targets, task="binary")
+    train_mcc = torchmetrics.functional.classification.binary_matthews_corrcoef(train_outputs, train_targets)
+
+    print(f"\tTrain accuracy: {train_accuracy*100.0:.1f}%")
+    print(f"\tTrain MCC: {train_mcc*100.0:.1f}%")
+
+    
+    train_outputs = (train_outputs>0.5).float()
+    print('\t' + str(metric(train_outputs, train_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
 
 
     #### VALIDATION ####
@@ -296,8 +345,7 @@ for epoch in range(NUM_EPOCHS):
 
             validation_outputs.append(sigmoid(validation_output.cpu().flatten()))
             validation_targets.append(validation_target.flatten())
-
-
+    
     print(f"\tMean validation loss: {total_validation_loss / len(val_loader):.2f}")
     validation_outputs, validation_targets = torch.cat(validation_outputs), torch.cat(validation_targets)
     
@@ -308,7 +356,6 @@ for epoch in range(NUM_EPOCHS):
     print(f"\tValidation MCC: {validation_mcc*100.0:.1f}%")
 
     validation_outputs = (validation_outputs>0.5).float()
-    metric = BinaryConfusionMatrix()
     print('\t' + str(metric(validation_outputs, validation_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
 
 
@@ -348,7 +395,7 @@ for epoch in range(NUM_EPOCHS):
 
     test_outputs = (test_outputs>0.5).float()
     print('\t' + str(metric(test_outputs, test_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
-
+    
 
     #### SAVE MODEL WEIGHTS ####
     path_model = outputs_folder + "/model" + str(epoch) + ".pth"
