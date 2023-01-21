@@ -3,13 +3,21 @@ cts.directory: /home/guevenira/Data/shared/PDAC_CT/CTs
 cst.label.csv: /home/guevenira/Data/shared/PDAC_CT/pseudonymised_patient_info.csv
 cts.label.problematic: /home/guevenira/Data/shared/Problematic_CTs
 
-data.label.name: Geschlecht
-#data.label.name: Befund-Verlauf
+
+#data.label.name: Geschlecht
+#data.label.name.version: geschlecht_v1
+
+data.label.name: Befund-Verlauf
+#data.label.name.version: befund_verlauf_v1
+data.label.name.version: befund_verlauf_v2
+
 #data.label.name: Befund-Verlauf-Therapie-Procedere
+#data.label.name.version: befund_verlauf_therapie_procedere_v1
+
 
 data.label.balanced: False
 data.label.balanced.shuffled: False
 
 data.augmentation: True
-data.augmentation.horizontal_flip_threshold: 1
-data.augmentation.translation_threshold: 0.5
+data.augmentation.horizontal_flip_threshold: 0
+data.augmentation.translation_threshold: 0

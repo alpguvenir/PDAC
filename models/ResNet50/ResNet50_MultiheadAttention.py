@@ -1,5 +1,6 @@
 import torch.nn as nn
 from torchvision import models
+from functools import partial
 
 class ResNet50_MultiheadAttention(nn.Module):
     def __init__(self):
@@ -9,8 +10,9 @@ class ResNet50_MultiheadAttention(nn.Module):
 
         hidden_size1 = 2048
         
-        feature_extractor = models.resnet.resnet50(pretrained=True)
-        
+        #feature_extractor = models.resnet.resnet50(pretrained=True)
+        feature_extractor = models.resnet.resnet50(norm_layer=partial(nn.BatchNorm2d, track_running_stats=False), weights=None)
+
         # Fully connected layer returning (hidden_size1) 256 units
         # fc contains 1000 nodes at the end, so override it to keep the same number of nodes as in_features = 2048
         

@@ -11,7 +11,7 @@ class ResNet18_MultiheadAttention(nn.Module):
 
         hidden_size1 = 256
 
-        feature_extractor = models.resnet.resnet18(pretrained=True)
+        feature_extractor = models.resnet.resnet18(weights=models.ResNet18_Weights.DEFAULT)
 
         feature_extractor.fc = (
             nn.Linear(512, hidden_size1) if hidden_size1 != 512 else nn.Identity()
@@ -42,4 +42,5 @@ class ResNet18_MultiheadAttention(nn.Module):
         out = self.classifier(features.squeeze(0))
         # print(out.shape)
         
-        return out, att_map
+        #return out, att_map
+        return out
