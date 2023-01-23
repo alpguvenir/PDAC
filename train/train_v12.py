@@ -9,6 +9,7 @@ from tqdm import tqdm
 import random
 import os
 from datetime import datetime
+import pandas as pd
 
 import torch
 import torch.nn as nn
@@ -31,6 +32,8 @@ from models.ResNet101.ResNet101_MultiheadAttention import ResNet101_MultiheadAtt
 from models.ResNet101.ResNet101_sum import ResNet101_sum
 
 from models.ResNet152.ResNet152_MultiheadAttention import ResNet152_MultiheadAttention
+from models.ResNet152.ResNet152_MultiheadAttention_stats_False import ResNet152_MultiheadAttention_stats_False
+from models.ResNet152.ResNet152_CBAM_MultiheadAttention import ResNet152_CBAM_MultiheadAttention
 
 
 
@@ -40,6 +43,14 @@ def get_file_paths(path):
 
 with open('../parameters.yml') as params:
     params_dict = yaml.safe_load(params)
+
+
+ct_files_path = get_file_paths(params_dict.get("cts.directory"))
+ct_labels_path = params_dict.get("cst.label.csv")
+ct_labels_exclude_path = params_dict.get("cts.label.problematic")
+
+ct_labels_df = pd.read_csv(ct_labels_path, index_col=0)
+ct_labels_exclude_df = pd.read_csv(ct_labels_exclude_path, index_col=False)
 
 
 # Getting the current date and time
@@ -211,7 +222,7 @@ transforms = {
                 'Uniform-Layers': {'uniform': 200},
 
                 'zero-pad-number-of-layers' : {'bool': False},
-                'Zero-Pad-Layers' : {'zeropad': 200},
+                'Zero-Pad-Layers' : {'zeropad': 100},
             }
 
 # FIXME when training only on train instances or train + validation instances
@@ -230,7 +241,7 @@ test_loader = DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE)
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-model = ResNet152_MultiheadAttention()
+model = ResNet152_CBAM_MultiheadAttention()
 model.to(device)
 
 
@@ -243,11 +254,11 @@ sigmoid = nn.Sigmoid()
 metric = BinaryConfusionMatrix()
 
 # FIXME when training with pos_weight or not
-pos_weight_multiplier = 1
-pos_weight = (train_ct_labels_list.count(0) / train_ct_labels_list.count(1)) * pos_weight_multiplier
-criterion = nn.BCEWithLogitsLoss(pos_weight = torch.tensor(pos_weight))
+#pos_weight_multiplier = 1
+#pos_weight = (train_ct_labels_list.count(0) / train_ct_labels_list.count(1)) * pos_weight_multiplier
+#criterion = nn.BCEWithLogitsLoss(pos_weight = torch.tensor(pos_weight))
 # FIXME 
-#criterion = nn.BCEWithLogitsLoss()
+criterion = nn.BCEWithLogitsLoss()
 
 optimizer = optim.Adam(model.parameters(), lr=lr)
 sched = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[3, 4], gamma=0.01)
@@ -284,7 +295,10 @@ for epoch in range(NUM_EPOCHS):
 
     train_outputs= []
     train_targets= []
+    train_tp_1_and_2_outputs = []
+    train_tp_1_and_2_targets = []
 
+    train_iteration = 0
     for train_input, train_target in pbar_train_loop:
         optimizer.zero_grad()
 
@@ -306,9 +320,17 @@ for epoch in range(NUM_EPOCHS):
         train_outputs.append(sigmoid(train_output.cpu().flatten()))
         train_targets.append(train_target.flatten())
 
-    print(f"\tMean train loss: {total_train_loss / len(train_loader):.2f}")
+        ct_index = ct_labels_df.index[ct_labels_df['Pseudonym'] == os.path.basename(train_ct_scans_list[train_iteration])[:-4]].tolist()[0]
+        if(params_dict.get("data.label.name") == "Befund-Verlauf"):
+            if str(ct_labels_df.loc[ct_index]["Therapie-Procedere"]) in ["1", "2"]:
+                train_tp_1_and_2_outputs.append(sigmoid(train_output.cpu().flatten()))
+                train_tp_1_and_2_targets.append(train_target.flatten())
+    
+        train_iteration += 1
+
     sched.step()
 
+    print(f"\tMean train loss: {total_train_loss / len(train_loader):.2f}")
     train_outputs, train_targets = torch.cat(train_outputs), torch.cat(train_targets)
     
     train_accuracy = torchmetrics.functional.accuracy(train_outputs, train_targets, task="binary")
@@ -317,9 +339,13 @@ for epoch in range(NUM_EPOCHS):
     print(f"\tTrain accuracy: {train_accuracy*100.0:.1f}%")
     print(f"\tTrain MCC: {train_mcc*100.0:.1f}%")
 
-    
     train_outputs = (train_outputs>0.5).float()
     print('\t' + str(metric(train_outputs, train_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
+
+    print('\t' + "Train Therapie-Procedere")
+    train_tp_1_and_2_outputs, train_tp_1_and_2_targets = torch.cat(train_tp_1_and_2_outputs), torch.cat(train_tp_1_and_2_targets)
+    train_tp_1_and_2_outputs = (train_tp_1_and_2_outputs>0.5).float()
+    print('\t' + str(metric(train_tp_1_and_2_outputs, train_tp_1_and_2_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
 
 
     #### VALIDATION ####
@@ -365,7 +391,10 @@ for epoch in range(NUM_EPOCHS):
     total_test_loss = 0
     test_outputs = []
     test_targets = []
+    test_tp_1_and_2_outputs = []
+    test_tp_1_and_2_targets = []
 
+    test_iteration = 0
     with torch.no_grad():
         for test_input, test_target in tqdm(test_loader, leave=False):
 
@@ -383,6 +412,13 @@ for epoch in range(NUM_EPOCHS):
             test_outputs.append(sigmoid(test_output.cpu().flatten()))
             test_targets.append(test_target.flatten())
 
+            ct_index = ct_labels_df.index[ct_labels_df['Pseudonym'] == os.path.basename(test_ct_scans_list[test_iteration])[:-4]].tolist()[0]
+            if(params_dict.get("data.label.name") == "Befund-Verlauf"):
+                if str(ct_labels_df.loc[ct_index]["Therapie-Procedere"]) in ["1", "2"]:
+                    test_tp_1_and_2_outputs.append(sigmoid(test_output.cpu().flatten()))
+                    test_tp_1_and_2_targets.append(test_target.flatten())
+        
+            test_iteration += 1
     
     print(f"\tMean test loss: {total_test_loss / len(test_loader):.2f}")
     test_outputs, test_targets = torch.cat(test_outputs), torch.cat(test_targets)
@@ -396,6 +432,11 @@ for epoch in range(NUM_EPOCHS):
     test_outputs = (test_outputs>0.5).float()
     print('\t' + str(metric(test_outputs, test_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
     
+    print('\t' + "Test Therapie-Procedere")
+    test_tp_1_and_2_outputs, test_tp_1_and_2_targets = torch.cat(test_tp_1_and_2_outputs), torch.cat(test_tp_1_and_2_targets)
+    test_tp_1_and_2_outputs = (test_tp_1_and_2_outputs>0.5).float()
+    print('\t' + str(metric(test_tp_1_and_2_outputs, test_tp_1_and_2_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
+
 
     #### SAVE MODEL WEIGHTS ####
     path_model = outputs_folder + "/model" + str(epoch) + ".pth"

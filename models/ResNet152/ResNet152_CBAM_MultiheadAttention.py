@@ -1,8 +1,9 @@
+import torch
 import torch.nn as nn
 from torchvision import models
 from functools import partial
 
-class ResNet152_MultiheadAttention(nn.Module):
+class ResNet152_CBAM_MultiheadAttention(nn.Module):
     def __init__(self):
         super().__init__()
 
@@ -51,9 +52,42 @@ class ResNet152_MultiheadAttention(nn.Module):
 
         # [batch_size, channels, height, width]
         
+        """
         features = self.feature_extractor(x).unsqueeze(
             1
         )  # assuming only 1 CT at a time
+        print("features", features.shape)
+        """
+
+        """
+        conv1
+        bn1
+        relu
+        maxpool
+        layer1
+        layer2
+        layer3
+        layer4
+        avgpool
+        fc
+        """
+        # https://github.com/pytorch/vision/blob/main/torchvision/models/resnet.py
+        # Check _forward_impl()
+        
+        x = self.feature_extractor.conv1(x)
+        x = self.feature_extractor.bn1(x)
+        x = self.feature_extractor.relu(x)        
+        x = self.feature_extractor.maxpool(x)
+
+        x = self.feature_extractor.layer1(x)
+        x = self.feature_extractor.layer2(x)
+        x = self.feature_extractor.layer3(x)
+        x = self.feature_extractor.layer4(x)
+
+        x = self.feature_extractor.avgpool(x)
+        x = torch.flatten(x, 1)
+        x = self.feature_extractor.fc(x)
+        features = (x).unsqueeze(1)
 
         #print("features.shape", features.shape)
 

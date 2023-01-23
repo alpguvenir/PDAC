@@ -61,12 +61,14 @@ class Dataset(torch.utils.data.Dataset):
 
         max_number_of_layers = self.transforms['Max-Layers']['max']
         uniform_number_of_layers = self.transforms['Uniform-Layers']['uniform']
+        zeropad_number_of_layers = self.transforms['Zero-Pad-Layers']['zeropad']
 
         limit_max_number_of_layers = self.transforms['limit-max-number-of-layers']['bool']
         set_uniform_number_of_layers = self.transforms['uniform-number-of-layers']['bool']
+        zero_pad_number_of_layers = self.transforms['zero-pad-number-of-layers']['bool']
 
 
-        assert limit_max_number_of_layers != set_uniform_number_of_layers, "Either there should be a maximum threshold or a uniform number of layers"
+        #assert limit_max_number_of_layers != set_uniform_number_of_layers, "Either there should be a maximum threshold or a uniform number of layers"
 
 
         # Open image by nibabel
@@ -187,6 +189,7 @@ class Dataset(torch.utils.data.Dataset):
 
         # Setting all CTs to same number of layers
         elif set_uniform_number_of_layers:
+
             divider = 0
             for ct_instance_layer_index in range(uniform_number_of_layers):
                 
@@ -218,4 +221,69 @@ class Dataset(torch.utils.data.Dataset):
                     ct_instance_tensor = torch.cat((ct_instance_tensor, ct_instance_tensor_new_layer), 0)
         
             ct_instance_tensor = torch.unsqueeze(ct_instance_tensor, 0)
+            return ct_instance_tensor, torch.tensor(ct_label)
+
+        elif zero_pad_number_of_layers:
+
+            if(ct_instance_layer_number > zeropad_number_of_layers):      
+                divider = 0
+                for ct_instance_layer_index in range(max_number_of_layers):
+
+                    divider += ct_instance_layer_number / max_number_of_layers
+                    ct_instance_layer_index = int(divider) - 1
+                    ct_instance_layer = ct_instance[:,:,ct_instance_layer_index]
+                    ct_instance_layer_clipped = np.clip(ct_instance_layer, amin, amax)
+                    ct_instance_layer_clipped_normalized = (ct_instance_layer_clipped - (lower_bound)) / ((upper_bound) - (lower_bound))
+                    ct_instance_layer_clipped_normalized_rotated = np.rot90(ct_instance_layer_clipped_normalized)
+                    ct_instance_layer_clipped_normalized_rotated_resized = cv2.resize(ct_instance_layer_clipped_normalized_rotated, dsize=(height, width), interpolation=cv2.INTER_CUBIC)
+                    ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized[crop_height_begin:crop_height_end, crop_width_begin:crop_width_end]
+
+                    if self.train_mode and self.params_dict.get("data.augmentation"):
+
+                        if horizontal_flip_prob > horizontal_flip_threshold:
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.flip(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1)
+                        
+                        if translation_prob > translation_threshold:
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.warpPerspective(ct_instance_layer_clipped_normalized_rotated_resized_cropped, M, 
+                                                                                                            (ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[0], ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[1]))
+
+                    if ct_instance_tensor == []:
+                        ct_instance_tensor = torch.tensor(ct_instance_layer_clipped_normalized_rotated_resized_cropped.copy(), dtype=torch.float)
+                        ct_instance_tensor = torch.unsqueeze(ct_instance_tensor, 0)
+                    else:
+                        ct_instance_tensor_new_layer = torch.tensor(ct_instance_layer_clipped_normalized_rotated_resized_cropped.copy(), dtype=torch.float)
+                        ct_instance_tensor_new_layer = torch.unsqueeze(ct_instance_tensor_new_layer, 0)
+                        ct_instance_tensor = torch.cat((ct_instance_tensor, ct_instance_tensor_new_layer), 0)
+            else:
+                for ct_instance_layer_index in range(ct_instance_layer_number):
+
+                    ct_instance_layer = ct_instance[:,:,ct_instance_layer_index]                    
+                    ct_instance_layer_clipped = np.clip(ct_instance_layer, amin, amax)
+                    ct_instance_layer_clipped_normalized = (ct_instance_layer_clipped - (lower_bound)) / ((upper_bound) - (lower_bound))
+                    ct_instance_layer_clipped_normalized_rotated = np.rot90(ct_instance_layer_clipped_normalized)
+                    ct_instance_layer_clipped_normalized_rotated_resized = cv2.resize(ct_instance_layer_clipped_normalized_rotated, dsize=(height, width), interpolation=cv2.INTER_CUBIC)
+                    ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized[crop_height_begin:crop_height_end, crop_width_begin:crop_width_end]
+
+                    if self.train_mode and self.params_dict.get("data.augmentation"):
+
+                        if horizontal_flip_prob > horizontal_flip_threshold:
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.flip(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1)
+                        
+                        if translation_prob > translation_threshold:
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.warpPerspective(ct_instance_layer_clipped_normalized_rotated_resized_cropped, M, 
+                                                                                                        (ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[0], ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[1]))
+
+                    if ct_instance_tensor == []:
+                        ct_instance_tensor = torch.tensor(ct_instance_layer_clipped_normalized_rotated_resized_cropped.copy(), dtype=torch.float)
+                        ct_instance_tensor = torch.unsqueeze(ct_instance_tensor, 0)
+                    else:
+                        ct_instance_tensor_new_layer = torch.tensor(ct_instance_layer_clipped_normalized_rotated_resized_cropped.copy(), dtype=torch.float)
+                        ct_instance_tensor_new_layer = torch.unsqueeze(ct_instance_tensor_new_layer, 0)
+                        ct_instance_tensor = torch.cat((ct_instance_tensor, ct_instance_tensor_new_layer), 0)
+
+                # Calculate how many layers missing
+                pad = torch.zeros(zeropad_number_of_layers - ct_instance_layer_number, crop_height_end - crop_height_begin, crop_width_end - crop_width_begin)
+                ct_instance_tensor = torch.cat((pad, ct_instance_tensor), 0)
+                
+            ct_instance_tensor = torch.unsqueeze(ct_instance_tensor, 0)            
             return ct_instance_tensor, torch.tensor(ct_label)

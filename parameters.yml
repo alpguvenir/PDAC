@@ -18,6 +18,6 @@ data.label.name.version: befund_verlauf_v2
 data.label.balanced: False
 data.label.balanced.shuffled: False
 
-data.augmentation: True
-data.augmentation.horizontal_flip_threshold: 0
-data.augmentation.translation_threshold: 0
+data.augmentation: False
+data.augmentation.horizontal_flip_threshold: 1
+data.augmentation.translation_threshold: 0.5
