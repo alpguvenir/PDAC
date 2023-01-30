@@ -12,8 +12,11 @@ import pandas as pd
 def get_file_paths(path):
     return glob.glob(path + "/*")
 
+# 1 for bv1,    test sizes 0.2 and 0.5
+# 2023 for bv2, test sizes 0.2 and 0.5
+# 11 for bv3, test sizes 0.25 and 0.6
 
-random.seed(1)
+random.seed(11)
 
 
 with open('../parameters.yml') as params:
@@ -93,8 +96,9 @@ ct_scans_list, ct_labels_list = list(ct_scans_list), list(ct_labels_list)
 # num_of_1s = ct_labels_list.count(1)
 
 
-train_ct_scans_list, test_val_ct_scans_list, train_ct_labels_list, test_val_ct_labels_list = train_test_split(ct_scans_list, ct_labels_list, stratify=ct_labels_list, test_size=0.2)
-val_ct_scans_list, test_ct_scans_list, val_ct_labels_list, test_ct_labels_list = train_test_split(test_val_ct_scans_list, test_val_ct_labels_list, stratify=test_val_ct_labels_list, test_size=0.5)
+# Change test sizes accordingly for the split ratios wanted
+train_ct_scans_list, test_val_ct_scans_list, train_ct_labels_list, test_val_ct_labels_list = train_test_split(ct_scans_list, ct_labels_list, stratify=ct_labels_list, test_size=0.25)
+val_ct_scans_list, test_ct_scans_list, val_ct_labels_list, test_ct_labels_list = train_test_split(test_val_ct_scans_list, test_val_ct_labels_list, stratify=test_val_ct_labels_list, test_size=0.6)
 
 
 file_header_name = params_dict.get("data.label.name").replace("-", "_").lower()

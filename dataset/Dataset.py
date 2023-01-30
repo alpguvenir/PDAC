@@ -4,12 +4,12 @@ import yaml
 import random
 
 import torch
-import torchvision.transforms.functional as TF
+import torchvision.transforms.functional as F
 import numpy as np
 from matplotlib import pyplot as plt
 
 import nibabel as nib
-from PIL import Image
+from PIL import Image, ImageEnhance
 from skimage import color
 from skimage import io
 import cv2 
@@ -86,6 +86,12 @@ class Dataset(torch.utils.data.Dataset):
         translation_prob = random.random()
         translation_threshold = self.params_dict.get("data.augmentation.translation_threshold")
 
+        gaussian_prob = random.random()
+        gaussian_threshold= self.params_dict.get("data.augmentation.gaussian_threshold")
+
+        brightness_contrast_sharpness_prob = random.random()
+        brightness_contrast_sharpness_threshold = self.params_dict.get("data.augmentation.brightness_contrast_sharpness_threshold")
+
         # Transformation matrix for translation
         horizontal_shift = random.randint(-5, 5)
         vertical_shift = random.randint(-5, 5)
@@ -94,6 +100,9 @@ class Dataset(torch.utils.data.Dataset):
                         [0, 1, vertical_shift],   # Vertical shift, + to bottom and - to top
                         [0, 0, 1]])
 
+        mean = 0
+        variance = 0.05
+        noise = np.random.normal(mean, variance, [crop_height_end - crop_height_begin, crop_width_end - crop_width_begin]) 
 
         ct_instance_tensor = []
 
@@ -147,6 +156,21 @@ class Dataset(torch.utils.data.Dataset):
                             ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.warpPerspective(ct_instance_layer_clipped_normalized_rotated_resized_cropped, M, 
                                                                                                             (ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[0], ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[1]))
 
+                        # Dont do both, too much augmentation
+                        if gaussian_prob > gaussian_threshold:
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped += noise
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = np.clip(ct_instance_layer_clipped_normalized_rotated_resized_cropped, amin, amax)
+                            
+                        elif brightness_contrast_sharpness_prob > brightness_contrast_sharpness_threshold:
+                            # B 0.9, C 1.3
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = torch.from_numpy(ct_instance_layer_clipped_normalized_rotated_resized_cropped).unsqueeze(0)
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_brightness(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 0.9)
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_contrast(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1.3)
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_sharpness(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1.5)
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized_cropped.squeeze(0)
+
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized_cropped.detach().numpy()
+
                     if ct_instance_tensor == []:
                         ct_instance_tensor = torch.tensor(ct_instance_layer_clipped_normalized_rotated_resized_cropped.copy(), dtype=torch.float)
                         ct_instance_tensor = torch.unsqueeze(ct_instance_tensor, 0)
@@ -174,6 +198,22 @@ class Dataset(torch.utils.data.Dataset):
                         if translation_prob > translation_threshold:
                             ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.warpPerspective(ct_instance_layer_clipped_normalized_rotated_resized_cropped, M, 
                                                                                                            (ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[0], ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[1]))
+
+                        # Dont do both, too much augmentation
+                        if gaussian_prob > gaussian_threshold:
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped += noise
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = np.clip(ct_instance_layer_clipped_normalized_rotated_resized_cropped, amin, amax)
+                            
+                        elif brightness_contrast_sharpness_prob > brightness_contrast_sharpness_threshold:
+                            # B 0.9, C 1.3
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = torch.from_numpy(ct_instance_layer_clipped_normalized_rotated_resized_cropped).unsqueeze(0)
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_brightness(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 0.9)
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_contrast(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1.3)
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_sharpness(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1.5)
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized_cropped.squeeze(0)
+
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized_cropped.detach().numpy()
+
 
                     if ct_instance_tensor == []:
                         ct_instance_tensor = torch.tensor(ct_instance_layer_clipped_normalized_rotated_resized_cropped.copy(), dtype=torch.float)
@@ -211,6 +251,22 @@ class Dataset(torch.utils.data.Dataset):
                     if translation_prob > translation_threshold:
                         ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.warpPerspective(ct_instance_layer_clipped_normalized_rotated_resized_cropped, M, 
                                                                                                            (ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[0], ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[1]))
+                    
+                    # Dont do both, too much augmentation
+                    if gaussian_prob > gaussian_threshold:
+                        ct_instance_layer_clipped_normalized_rotated_resized_cropped += noise
+                        ct_instance_layer_clipped_normalized_rotated_resized_cropped = np.clip(ct_instance_layer_clipped_normalized_rotated_resized_cropped, amin, amax)
+                        
+                    elif brightness_contrast_sharpness_prob > brightness_contrast_sharpness_threshold:
+                        # B 0.9, C 1.3
+                        ct_instance_layer_clipped_normalized_rotated_resized_cropped = torch.from_numpy(ct_instance_layer_clipped_normalized_rotated_resized_cropped).unsqueeze(0)
+                        ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_brightness(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 0.9)
+                        ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_contrast(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1.3)
+                        ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_sharpness(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1.5)
+                        ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized_cropped.squeeze(0)
+
+                        ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized_cropped.detach().numpy()
+
 
                 if ct_instance_tensor == []:
                     ct_instance_tensor = torch.tensor(ct_instance_layer_clipped_normalized_rotated_resized_cropped.copy(), dtype=torch.float)
@@ -247,6 +303,22 @@ class Dataset(torch.utils.data.Dataset):
                             ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.warpPerspective(ct_instance_layer_clipped_normalized_rotated_resized_cropped, M, 
                                                                                                             (ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[0], ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[1]))
 
+                        # Dont do both, too much augmentation
+                        if gaussian_prob > gaussian_threshold:
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped += noise
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = np.clip(ct_instance_layer_clipped_normalized_rotated_resized_cropped, amin, amax)
+                            
+                        elif brightness_contrast_sharpness_prob > brightness_contrast_sharpness_threshold:
+                            # B 0.9, C 1.3
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = torch.from_numpy(ct_instance_layer_clipped_normalized_rotated_resized_cropped).unsqueeze(0)
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_brightness(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 0.9)
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_contrast(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1.3)
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_sharpness(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1.5)
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized_cropped.squeeze(0)
+
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized_cropped.detach().numpy()
+
+
                     if ct_instance_tensor == []:
                         ct_instance_tensor = torch.tensor(ct_instance_layer_clipped_normalized_rotated_resized_cropped.copy(), dtype=torch.float)
                         ct_instance_tensor = torch.unsqueeze(ct_instance_tensor, 0)
@@ -272,6 +344,22 @@ class Dataset(torch.utils.data.Dataset):
                         if translation_prob > translation_threshold:
                             ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.warpPerspective(ct_instance_layer_clipped_normalized_rotated_resized_cropped, M, 
                                                                                                         (ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[0], ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[1]))
+                        
+                        # Dont do both, too much augmentation
+                        if gaussian_prob > gaussian_threshold:
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped += noise
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = np.clip(ct_instance_layer_clipped_normalized_rotated_resized_cropped, amin, amax)
+                            
+                        elif brightness_contrast_sharpness_prob > brightness_contrast_sharpness_threshold:
+                            # B 0.9, C 1.3
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = torch.from_numpy(ct_instance_layer_clipped_normalized_rotated_resized_cropped).unsqueeze(0)
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_brightness(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 0.9)
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_contrast(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1.3)
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_sharpness(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1.5)
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized_cropped.squeeze(0)
+
+                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized_cropped.detach().numpy()
+
 
                     if ct_instance_tensor == []:
                         ct_instance_tensor = torch.tensor(ct_instance_layer_clipped_normalized_rotated_resized_cropped.copy(), dtype=torch.float)
