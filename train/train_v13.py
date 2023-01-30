@@ -10,7 +10,6 @@ import random
 import os
 from datetime import datetime
 import pandas as pd
-from matplotlib import pyplot as plt
 
 import torch
 import torch.nn as nn
@@ -27,7 +26,6 @@ from models.ResNet18.ResNet18_mean import ResNet18_mean
 from models.ResNet18.ResNet18_Linear import ResNet18_Linear
 
 from models.ResNet50.ResNet50_MultiheadAttention import ResNet50_MultiheadAttention
-from models.ResNet50.ResNet50_MultiheadAttention_v2 import ResNet50_MultiheadAttention_v2
 from models.ResNet50.ResNet50_sum import ResNet50_sum
 
 from models.ResNet101.ResNet101_MultiheadAttention import ResNet101_MultiheadAttention
@@ -39,7 +37,8 @@ from models.ResNet152.ResNet152_CBAM_MultiheadAttention import ResNet152_CBAM_Mu
 
 from models.unofficial_ResNet50_CBAM.ResNet50 import ResNet50
 
-from models.VGG16.VGG16_MultiheadAttention import VGG16_MultiheadAttention
+from models.S3D.S3D import S3D
+from models import ViViT
 
 def get_file_paths(path):
     return glob.glob(path + "/*")
@@ -216,11 +215,11 @@ transforms = {
 
                 'Resize': {'height': 256, 'width': 256},    # Original CT layer sizes are 512 x 512
 
-                'Crop-Height' : {'begin': 16, 'end': 240},
-                'Crop-Width' : {'begin': 16, 'end': 240},
+                'Crop-Height' : {'begin': 0, 'end': 256},
+                'Crop-Width' : {'begin': 0, 'end': 256},
 
                 'limit-max-number-of-layers' : {'bool': True},
-                'Max-Layers' : {'max': 100},
+                'Max-Layers' : {'max': 200},
                 
                 'uniform-number-of-layers' : {'bool': False},
                 'Uniform-Layers': {'uniform': 200},
@@ -230,8 +229,8 @@ transforms = {
             }
 
 # FIXME when training only on train instances or train + validation instances
-#train_ct_scans_list = train_ct_scans_list + val_ct_scans_list
-#train_ct_labels_list = train_ct_labels_list + val_ct_labels_list
+train_ct_scans_list = train_ct_scans_list + val_ct_scans_list
+train_ct_labels_list = train_ct_labels_list + val_ct_labels_list
 # FIXME 
 
 train_dataset = Dataset.Dataset(train_ct_scans_list, train_ct_labels_list, transforms=transforms, train_mode = True)
@@ -245,7 +244,9 @@ test_loader = DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE)
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-model = ResNet152_MultiheadAttention()
+# ResNet50_MultiheadAttention
+# ResNet50
+model = S3D()
 model.to(device)
 
 
@@ -258,38 +259,21 @@ sigmoid = nn.Sigmoid()
 metric = BinaryConfusionMatrix()
 
 # FIXME when training with pos_weight or not
-#pos_weight_multiplier = 1
-#pos_weight = (train_ct_labels_list.count(0) / train_ct_labels_list.count(1)) * pos_weight_multiplier
-#criterion = nn.BCEWithLogitsLoss(pos_weight = torch.tensor(pos_weight))
+pos_weight_multiplier = 1
+pos_weight = (train_ct_labels_list.count(0) / train_ct_labels_list.count(1)) * pos_weight_multiplier
+criterion = nn.BCEWithLogitsLoss(pos_weight = torch.tensor(pos_weight))
 # FIXME 
-criterion = nn.BCEWithLogitsLoss()
+# criterion = nn.BCEWithLogitsLoss()
 
 optimizer = optim.Adam(model.parameters(), lr=lr)
 sched = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[3, 4], gamma=0.01)
-
-
-train_loss_array = []
-train_accuracy_array = []
-train_mcc_array = []
-train_tp_1_and_2_mcc_array = []
-train_tp_0_mcc_array = []
-
-validation_loss_array = []
-validation_accuracy_array = []
-validation_mcc_array = []
-
-test_loss_array = []
-test_accuracy_array = []
-test_mcc_array = []
-test_tp_1_and_2_mcc_array = []
-test_tp_0_mcc_array = []
-
 
 for epoch in range(NUM_EPOCHS):
     print(f"Epoch: {epoch}")
     total_train_loss = 0
     model.train()
 
+    """
     if epoch == 0:
         model.feature_extractor.eval()
         for param in model.feature_extractor.parameters():
@@ -309,7 +293,8 @@ for epoch in range(NUM_EPOCHS):
     elif epoch > 4:
         for param in model.parameters():
             param.requires_grad = True
-
+    """
+    
     #### TRAIN ####
     pbar_train_loop = tqdm(train_loader, total=len(train_loader), leave=False)
 
@@ -317,15 +302,15 @@ for epoch in range(NUM_EPOCHS):
     train_targets= []
     train_tp_1_and_2_outputs = []
     train_tp_1_and_2_targets = []
-    train_tp_0_outputs = []
-    train_tp_0_targets = []
 
     train_iteration = 0
     for train_input, train_target in pbar_train_loop:
         optimizer.zero_grad()
 
+        """
         train_input = train_input.permute(2, 0, 1, 3, 4)
         train_input = torch.squeeze(train_input, 1)
+        """
 
         train_output = model(train_input.to(device))
 
@@ -333,9 +318,10 @@ for epoch in range(NUM_EPOCHS):
         train_loss.backward()
 
         optimizer.step()
-
         train_loss_value = train_loss.detach().cpu().item()
+
         total_train_loss += train_loss_value
+
         pbar_train_loop.set_description_str(f"Loss: {train_loss_value:.2f}")
 
         train_outputs.append(sigmoid(train_output.cpu().flatten()))
@@ -346,9 +332,6 @@ for epoch in range(NUM_EPOCHS):
             if str(ct_labels_df.loc[ct_index]["Therapie-Procedere"]) in ["1", "2"]:
                 train_tp_1_and_2_outputs.append(sigmoid(train_output.cpu().flatten()))
                 train_tp_1_and_2_targets.append(train_target.flatten())
-            elif str(ct_labels_df.loc[ct_index]["Therapie-Procedere"]) in ["0"]:
-                train_tp_0_outputs.append(sigmoid(train_output.cpu().flatten()))
-                train_tp_0_targets.append(train_target.flatten())
         
         train_iteration += 1
 
@@ -359,33 +342,19 @@ for epoch in range(NUM_EPOCHS):
     
     train_accuracy = torchmetrics.functional.accuracy(train_outputs, train_targets, task="binary")
     train_mcc = torchmetrics.functional.classification.binary_matthews_corrcoef(train_outputs, train_targets)
-    print(f"\tTrain accuracy: {train_accuracy*100.0:.1f}%    Train MCC: {train_mcc*100.0:.1f}%")
+
+    print(f"\tTrain accuracy: {train_accuracy*100.0:.1f}%")
+    print(f"\tTrain MCC: {train_mcc*100.0:.1f}%")
 
     train_outputs = (train_outputs>0.5).float()
     print('\t' + str(metric(train_outputs, train_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
 
-
-    if(params_dict.get("data.label.name") == "Befund-Verlauf"):
-        train_tp_1_and_2_outputs, train_tp_1_and_2_targets = torch.cat(train_tp_1_and_2_outputs), torch.cat(train_tp_1_and_2_targets)
-        train_tp_1_and_2_mcc = torchmetrics.functional.classification.binary_matthews_corrcoef(train_tp_1_and_2_outputs, train_tp_1_and_2_targets)
-        train_tp_0_outputs, train_tp_0_targets = torch.cat(train_tp_0_outputs), torch.cat(train_tp_0_targets)
-        train_tp_0_mcc = torchmetrics.functional.classification.binary_matthews_corrcoef(train_tp_0_outputs, train_tp_0_targets)
-        
-        print('\t' + "Train Therapie-Procedere = 1 | 2 ", "MCC: ", "{:.1f}".format(train_tp_1_and_2_mcc*100), "%")
-        train_tp_1_and_2_outputs = (train_tp_1_and_2_outputs>0.5).float()
-        print('\t' + str(metric(train_tp_1_and_2_outputs, train_tp_1_and_2_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
-
-        print('\t' + "Train Therapie-Procedere = 0 ", "MCC: ", "{:.1f}".format(train_tp_0_mcc*100), "%")
-        train_tp_0_outputs = (train_tp_0_outputs>0.5).float()
-        print('\t' + str(metric(train_tp_0_outputs, train_tp_0_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
-
-        train_tp_1_and_2_mcc_array.append(train_tp_1_and_2_mcc)
-        train_tp_0_mcc_array.append(train_tp_0_mcc)
-
-    train_loss_array.append(total_train_loss / len(train_loader))
-    train_accuracy_array.append(train_accuracy)
-    train_mcc_array.append(train_mcc)
-
+    """
+    print('\t' + "Train Therapie-Procedere")
+    train_tp_1_and_2_outputs, train_tp_1_and_2_targets = torch.cat(train_tp_1_and_2_outputs), torch.cat(train_tp_1_and_2_targets)
+    train_tp_1_and_2_outputs = (train_tp_1_and_2_outputs>0.5).float()
+    print('\t' + str(metric(train_tp_1_and_2_outputs, train_tp_1_and_2_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
+    """
 
     #### VALIDATION ####
     model.eval()
@@ -397,32 +366,33 @@ for epoch in range(NUM_EPOCHS):
     with torch.no_grad():
         for validation_input, validation_target in tqdm(val_loader, leave=False):
 
+            """
             validation_input = validation_input.permute(2, 0, 1, 3, 4)
             validation_input = torch.squeeze(validation_input, 1)
+            """
 
             validation_output = model(validation_input.to(device))
 
             validation_loss = criterion(validation_output, torch.unsqueeze(validation_target, 0).float().to(device))
+    
             validation_loss_value = validation_loss.detach().cpu().item()
+
             total_validation_loss += validation_loss_value
 
             validation_outputs.append(sigmoid(validation_output.cpu().flatten()))
             validation_targets.append(validation_target.flatten())
     
-    print(f"\n\tMean validation loss: {total_validation_loss / len(val_loader):.2f}")
+    print(f"\tMean validation loss: {total_validation_loss / len(val_loader):.2f}")
     validation_outputs, validation_targets = torch.cat(validation_outputs), torch.cat(validation_targets)
     
     validation_accuracy = torchmetrics.functional.accuracy(validation_outputs, validation_targets, task="binary")
     validation_mcc = torchmetrics.functional.classification.binary_matthews_corrcoef(validation_outputs, validation_targets)
 
-    print(f"\tValidation accuracy: {validation_accuracy*100.0:.1f}%    Validation MCC: {validation_mcc*100.0:.1f}%")
+    print(f"\tValidation accuracy: {validation_accuracy*100.0:.1f}%")
+    print(f"\tValidation MCC: {validation_mcc*100.0:.1f}%")
 
     validation_outputs = (validation_outputs>0.5).float()
     print('\t' + str(metric(validation_outputs, validation_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
-
-    validation_loss_array.append(total_validation_loss / len(val_loader))
-    validation_accuracy_array.append(validation_accuracy)
-    validation_mcc_array.append(validation_mcc)
 
 
     #### TEST ####
@@ -433,20 +403,22 @@ for epoch in range(NUM_EPOCHS):
     test_targets = []
     test_tp_1_and_2_outputs = []
     test_tp_1_and_2_targets = []
-    test_tp_0_outputs = []
-    test_tp_0_targets = []
 
     test_iteration = 0
     with torch.no_grad():
         for test_input, test_target in tqdm(test_loader, leave=False):
 
+            """
             test_input = test_input.permute(2, 0, 1, 3, 4)
             test_input = torch.squeeze(test_input, 1)
+            """
 
             test_output = model(test_input.to(device))
 
             test_loss = criterion(test_output, torch.unsqueeze(test_target, 0).float().to(device))
+
             test_loss_value = test_loss.detach().cpu().item()
+
             total_test_loss += test_loss_value
 
             test_outputs.append(sigmoid(test_output.cpu().flatten()))
@@ -457,78 +429,27 @@ for epoch in range(NUM_EPOCHS):
                 if str(ct_labels_df.loc[ct_index]["Therapie-Procedere"]) in ["1", "2"]:
                     test_tp_1_and_2_outputs.append(sigmoid(test_output.cpu().flatten()))
                     test_tp_1_and_2_targets.append(test_target.flatten())
-                elif str(ct_labels_df.loc[ct_index]["Therapie-Procedere"]) in ["0"]:
-                    test_tp_0_outputs.append(sigmoid(test_output.cpu().flatten()))
-                    test_tp_0_targets.append(test_target.flatten())
         
             test_iteration += 1
     
-    print(f"\n\tMean test loss: {total_test_loss / len(test_loader):.2f}")
+    print(f"\tMean test loss: {total_test_loss / len(test_loader):.2f}")
     test_outputs, test_targets = torch.cat(test_outputs), torch.cat(test_targets)
     
     test_accuracy = torchmetrics.functional.accuracy(test_outputs, test_targets, task="binary")
     test_mcc = torchmetrics.functional.classification.binary_matthews_corrcoef(test_outputs, test_targets)
-    print(f"\tTest accuracy: {test_accuracy*100.0:.1f}%    Test MCC: {test_mcc*100.0:.1f}%")
+
+    print(f"\tTest accuracy: {test_accuracy*100.0:.1f}%")
+    print(f"\tTest MCC: {test_mcc*100.0:.1f}%")
 
     test_outputs = (test_outputs>0.5).float()
     print('\t' + str(metric(test_outputs, test_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
     
-
-    if(params_dict.get("data.label.name") == "Befund-Verlauf"):
-        test_tp_1_and_2_outputs, test_tp_1_and_2_targets = torch.cat(test_tp_1_and_2_outputs), torch.cat(test_tp_1_and_2_targets)
-        test_tp_1_and_2_mcc = torchmetrics.functional.classification.binary_matthews_corrcoef(test_tp_1_and_2_outputs, test_tp_1_and_2_targets)
-        test_tp_0_outputs, test_tp_0_targets = torch.cat(test_tp_0_outputs), torch.cat(test_tp_0_targets)
-        test_tp_0_mcc = torchmetrics.functional.classification.binary_matthews_corrcoef(test_tp_0_outputs, test_tp_0_targets)
-
-        print('\t' + "Test Therapie-Procedere = 1 | 2", "MCC: ", "{:.1f}".format(test_tp_1_and_2_mcc*100), "%")
-        test_tp_1_and_2_outputs = (test_tp_1_and_2_outputs>0.5).float()
-        print('\t' + str(metric(test_tp_1_and_2_outputs, test_tp_1_and_2_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
-
-        print('\t' + "Test Therapie-Procedere = 0", "MCC: ", "{:.1f}".format(test_tp_0_mcc*100), "%")
-        test_tp_0_outputs = (test_tp_0_outputs>0.5).float()
-        print('\t' + str(metric(test_tp_0_outputs, test_tp_0_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
-
-        test_tp_1_and_2_mcc_array.append(test_tp_1_and_2_mcc)
-        test_tp_0_mcc_array.append(test_tp_0_mcc)
-
-    test_loss_array.append(total_test_loss / len(test_loader))
-    test_accuracy_array.append(test_accuracy)
-    test_mcc_array.append(test_mcc)
-
-
-    ################################################################################################
-    epoch_range = range(epoch + 1)
-    epoch_list = [*epoch_range]
-
-    plt.plot(epoch_list, train_loss_array, label="train loss")
-    plt.plot(epoch_list, validation_loss_array, label="validation loss")
-    plt.plot(epoch_list, test_loss_array, label="test loss")
-    plt.legend(loc=4)
-    plt.savefig(outputs_folder + "/loss.png")
-    plt.close()
-
-    plt.plot(epoch_list, train_accuracy_array, label="train accuracy")
-    plt.plot(epoch_list, validation_accuracy_array, label="validation accuracy")
-    plt.plot(epoch_list, test_accuracy_array, label="test accuracy")
-    plt.legend(loc=4)
-    plt.savefig(outputs_folder + "/accuracy.png")
-    plt.close()
-
-    plt.plot(epoch_list, train_mcc_array, label="train mcc")
-    plt.plot(epoch_list, validation_mcc_array, label="validation mcc")
-    plt.plot(epoch_list, test_mcc_array, label="test mcc")
-    plt.legend(loc=4)
-    plt.savefig(outputs_folder + "/mcc.png")
-    plt.close()
-
-    if(params_dict.get("data.label.name") == "Befund-Verlauf"):
-        plt.plot(epoch_list, train_tp_1_and_2_mcc_array, label="train tp1&2 mcc")
-        plt.plot(epoch_list, train_tp_0_mcc_array, label="train tp0 mcc")
-        plt.plot(epoch_list, test_tp_1_and_2_mcc_array, label="test tp1&2 mcc")
-        plt.plot(epoch_list, test_tp_0_mcc_array, label="test tp0 mcc")
-        plt.legend(loc=4)
-        plt.savefig(outputs_folder + "/mcc-tp.png")
-        plt.close()
+    """
+    print('\t' + "Test Therapie-Procedere")
+    test_tp_1_and_2_outputs, test_tp_1_and_2_targets = torch.cat(test_tp_1_and_2_outputs), torch.cat(test_tp_1_and_2_targets)
+    test_tp_1_and_2_outputs = (test_tp_1_and_2_outputs>0.5).float()
+    print('\t' + str(metric(test_tp_1_and_2_outputs, test_tp_1_and_2_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
+    """
 
     #### SAVE MODEL WEIGHTS ####
     path_model = outputs_folder + "/model" + str(epoch) + ".pth"

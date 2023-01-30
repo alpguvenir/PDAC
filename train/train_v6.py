@@ -26,7 +26,7 @@ from models.ResNet50.ResNet50_ViT import ResNet50_ViT
 from models.ViViT import ViViT
 from models.ResNet18.ResNet18_3D_MultiheadAttention import ResNet18_3D_MultiheadAttention
 
-from models.S3D import S3D
+from models.S3D.S3D import S3D
 
 def get_file_paths(path):
     return glob.glob(path + "/*")

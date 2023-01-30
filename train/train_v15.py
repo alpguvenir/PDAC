@@ -41,6 +41,11 @@ from models.unofficial_ResNet50_CBAM.ResNet50 import ResNet50
 
 from models.VGG16.VGG16_MultiheadAttention import VGG16_MultiheadAttention
 
+from models.ViT.ViT_b16_MultiheadAttention import ViT_b16_MultiheadAttention
+from models.ViT.ViT_l16_MultiheadAttention import ViT_l16_MultiheadAttention
+
+from models.MaxViT.MaxViT_MultiheadAttention import MaxViT_MultiheadAttention
+
 def get_file_paths(path):
     return glob.glob(path + "/*")
 
@@ -220,7 +225,7 @@ transforms = {
                 'Crop-Width' : {'begin': 16, 'end': 240},
 
                 'limit-max-number-of-layers' : {'bool': True},
-                'Max-Layers' : {'max': 100},
+                'Max-Layers' : {'max': 200},
                 
                 'uniform-number-of-layers' : {'bool': False},
                 'Uniform-Layers': {'uniform': 200},
@@ -245,7 +250,8 @@ test_loader = DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE)
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-model = ResNet152_MultiheadAttention()
+# change number of layers
+model = ViT_b16_MultiheadAttention()
 model.to(device)
 
 
@@ -258,9 +264,9 @@ sigmoid = nn.Sigmoid()
 metric = BinaryConfusionMatrix()
 
 # FIXME when training with pos_weight or not
-#pos_weight_multiplier = 1
-#pos_weight = (train_ct_labels_list.count(0) / train_ct_labels_list.count(1)) * pos_weight_multiplier
-#criterion = nn.BCEWithLogitsLoss(pos_weight = torch.tensor(pos_weight))
+pos_weight_multiplier = 1
+pos_weight = (train_ct_labels_list.count(0) / train_ct_labels_list.count(1)) * pos_weight_multiplier
+criterion = nn.BCEWithLogitsLoss(pos_weight = torch.tensor(pos_weight))
 # FIXME 
 criterion = nn.BCEWithLogitsLoss()
 
@@ -294,21 +300,18 @@ for epoch in range(NUM_EPOCHS):
         model.feature_extractor.eval()
         for param in model.feature_extractor.parameters():
             param.requires_grad = False
-        model.feature_extractor.conv1[0].weight.requires_grad = True
-        model.feature_extractor.conv1[0].bias.requires_grad = True
-    elif epoch == 1:
-        model.feature_extractor.eval()
-    elif epoch == 2:
-        pass
-    elif epoch == 3:
-        for param in model.feature_extractor.layer4.parameters():
-            param.requires_grad = True
-    elif epoch == 4:
-        for param in model.feature_extractor.layer3.parameters():
-            param.requires_grad = True
-    elif epoch > 4:
-        for param in model.parameters():
-            param.requires_grad = True
+        
+        # For ViT models
+        
+        model.feature_extractor.conv_proj[0].weight.requires_grad = True
+        model.feature_extractor.conv_proj[0].bias.requires_grad = True
+        
+
+        # For MaxViT models
+        """
+        model.feature_extractor.stem[0].weight.requires_grad = True
+        model.feature_extractor.stem[0].bias.requires_grad = True
+        """
 
     #### TRAIN ####
     pbar_train_loop = tqdm(train_loader, total=len(train_loader), leave=False)
