@@ -1,33 +1,25 @@
-import torch
 import torch.nn as nn
 from torchvision import models
+from functools import partial
 
-class S3D(nn.Module):
-
+class MaxViT_MultiheadAttention(nn.Module):
     def __init__(self):
         super().__init__()
 
-        # https://pytorch.org/vision/main/models/video_mvit.html
-        # https://github.com/pytorch/vision/issues/4083
-        # img = torch.randn(1, 3, 192, 112, 112).to(torch.float)
-
         get_params = lambda m: sum(p.numel() for p in m.parameters())
 
-        feature_extractor = models.video.s3d(weights='DEFAULT')
+        hidden_size1 = 1000
+        
+        feature_extractor = models.maxvit_t(weights=models.MaxVit_T_Weights)
 
-        #print(feature_extractor.features[0][0])
-
-        feature_extractor.features[0][0] = nn.Sequential(
-            nn.Conv3d(1, 3, 1), feature_extractor.features[0][0]
-        )
-                
-        hidden_size1 = 512
-        feature_extractor.classifier[1] = (
-            nn.Conv3d(1024, hidden_size1, 1)
-        )        
+        feature_extractor.stem = nn.Sequential( nn.Conv2d(1, 3, 1), feature_extractor.stem )
 
         self.feature_extractor = feature_extractor
-        self.att = nn.MultiheadAttention(hidden_size1, 8)
+        
+        # Number of heads 8, embedding dimension 256
+        self.att = nn.MultiheadAttention(hidden_size1, 10)
+        
+        # Classifier returning with only 1 unit, binary
         self.classifier = nn.Linear(hidden_size1, 1)
 
         print(f"Feature extractor has {get_params(self.feature_extractor)} params")
@@ -36,21 +28,27 @@ class S3D(nn.Module):
 
     def forward(self, x):
 
-        #print(self.feature_extractor.stem(x).shape)
-
+        # [batch_size, channels, height, width]
+        
         features = self.feature_extractor(x).unsqueeze(
             1
         )  # assuming only 1 CT at a time
+        
+        #print("features.shape", features.shape)
 
-        """
         query = features.mean(0, keepdims=True)
-        # print(features.shape)
-        # print(query.shape)
+
+        #print("query.shape", query.shape)
         
         features, att_map = self.att(query, features, features)
-        """
+
+        #print("features.shape", features.shape)
+
+        #print("att_map.shape", att_map.shape)
+        #print(torch.sum(att_map))
 
         out = self.classifier(features.squeeze(0))
         # print(out.shape)
+        
 
         return out

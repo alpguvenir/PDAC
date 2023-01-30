@@ -56,7 +56,8 @@ class ResNet152_MultiheadAttention(nn.Module):
         )  # assuming only 1 CT at a time
 
         #print("features.shape", features.shape)
-
+        #[batch size, 1, 2048]
+        
         query = features.mean(0, keepdims=True)
 
         #print("query.shape", query.shape)
