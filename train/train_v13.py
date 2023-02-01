@@ -35,7 +35,7 @@ from models.ResNet152.ResNet152_MultiheadAttention import ResNet152_MultiheadAtt
 from models.ResNet152.ResNet152_MultiheadAttention_stats_False import ResNet152_MultiheadAttention_stats_False
 from models.ResNet152.ResNet152_CBAM_MultiheadAttention import ResNet152_CBAM_MultiheadAttention
 
-from models.unofficial_ResNet50_CBAM.ResNet50 import ResNet50
+from models.unofficial_ResNet50_CBAM.ResNet50_CBAM_MultiheadAttention_unoffficial import ResNet50_CBAM_MultiheadAttention_unoffficial
 
 from models.S3D.S3D import S3D
 from models import ViViT

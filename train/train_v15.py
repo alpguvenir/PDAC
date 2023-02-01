@@ -37,7 +37,7 @@ from models.ResNet152.ResNet152_MultiheadAttention import ResNet152_MultiheadAtt
 from models.ResNet152.ResNet152_MultiheadAttention_stats_False import ResNet152_MultiheadAttention_stats_False
 from models.ResNet152.ResNet152_CBAM_MultiheadAttention import ResNet152_CBAM_MultiheadAttention
 
-from models.unofficial_ResNet50_CBAM.ResNet50 import ResNet50
+from models.unofficial_ResNet50_CBAM.ResNet50_CBAM_MultiheadAttention_unoffficial import ResNet50_CBAM_MultiheadAttention_unoffficial
 
 from models.VGG16.VGG16_MultiheadAttention import VGG16_MultiheadAttention
 
@@ -225,7 +225,7 @@ transforms = {
                 'Crop-Width' : {'begin': 16, 'end': 240},
 
                 'limit-max-number-of-layers' : {'bool': True},
-                'Max-Layers' : {'max': 200},
+                'Max-Layers' : {'max': 80},
                 
                 'uniform-number-of-layers' : {'bool': False},
                 'Uniform-Layers': {'uniform': 200},
@@ -251,7 +251,7 @@ test_loader = DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # change number of layers
-model = ViT_b16_MultiheadAttention()
+model = ViT_l16_MultiheadAttention()
 model.to(device)
 
 
@@ -268,7 +268,7 @@ pos_weight_multiplier = 1
 pos_weight = (train_ct_labels_list.count(0) / train_ct_labels_list.count(1)) * pos_weight_multiplier
 criterion = nn.BCEWithLogitsLoss(pos_weight = torch.tensor(pos_weight))
 # FIXME 
-criterion = nn.BCEWithLogitsLoss()
+#criterion = nn.BCEWithLogitsLoss()
 
 optimizer = optim.Adam(model.parameters(), lr=lr)
 sched = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[3, 4], gamma=0.01)
