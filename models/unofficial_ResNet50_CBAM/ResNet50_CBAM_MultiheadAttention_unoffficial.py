@@ -52,7 +52,7 @@ class BottleNeck(nn.Module):
         return out
 
 
-class ResNet50(nn.Module):
+class ResNet50_CBAM_MultiheadAttention_unoffficial(nn.Module):
     '''ResNet-50 Architecture.
     '''
 
@@ -60,7 +60,7 @@ class ResNet50(nn.Module):
     def __init__(self, use_cbam=True, image_depth=1, num_classes=1):
         '''Params init and build arch.
         '''
-        super(ResNet50, self).__init__()
+        super(ResNet50_CBAM_MultiheadAttention_unoffficial, self).__init__()
 
 
         hidden_size1 = 2048
