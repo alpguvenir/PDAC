@@ -133,7 +133,8 @@ class ResNet152_CBAM_MultiheadAttention(nn.Module):
 
         self.cbam_layer1 = CBAM(channel_in=256)
         self.cbam_layer2 = CBAM(channel_in=512)
-
+        self.cbam_layer3 = CBAM(channel_in=1024)
+        self.cbam_layer4 = CBAM(channel_in=2048)
 
         self.feature_extractor = feature_extractor
         
@@ -181,26 +182,36 @@ class ResNet152_CBAM_MultiheadAttention(nn.Module):
         """
         
         x = self.feature_extractor.conv1(x)
-        #print("conv1", x.shape)
+        # print("conv1", x.shape) 
+        # conv1 torch.Size([110, 64, 112, 112])
+        
         x = self.feature_extractor.bn1(x)
-        x = self.feature_extractor.relu(x)        
+        # print("bn1", x.shape)
+        # bn1 torch.Size([110, 64, 112, 112])
+
+        x = self.feature_extractor.relu(x)  
+        # print("relu", x.shape)
+        # relu torch.Size([110, 64, 112, 112])
+      
         x = self.feature_extractor.maxpool(x)
-        #print("maxpool", x.shape)
+        # print("maxpool", x.shape)
+        # maxpool torch.Size([110, 64, 56, 56])
 
         x = self.feature_extractor.layer1(x)
         #print("layer1", x.shape)
-
         x = self.cbam_layer1(x)
-        #print("cbam_layer1", x.shape)
 
         x = self.feature_extractor.layer2(x)
         #print("layer2", x.shape)
-        
         x = self.cbam_layer2(x)
-        #print("layer2", x.shape)
 
         x = self.feature_extractor.layer3(x)
+        #print("layer3", x.shape)
+        #x = self.cbam_layer3(x)
+
         x = self.feature_extractor.layer4(x)
+        #print("layer4", x.shape)
+        #x = self.cbam_layer4(x)
 
         x = self.feature_extractor.avgpool(x)
         x = torch.flatten(x, 1)

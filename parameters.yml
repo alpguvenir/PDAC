@@ -31,3 +31,9 @@ data.augmentation.horizontal_flip_threshold: 1
 data.augmentation.translation_threshold: 0.5
 data.augmentation.gaussian_threshold: 0.9
 data.augmentation.brightness_contrast_sharpness_threshold: 0.8
+
+
+#data.augmentation.horizontal_flip_threshold: 0.95
+#data.augmentation.translation_threshold: 0.5
+#data.augmentation.gaussian_threshold: 0.8
+#data.augmentation.brightness_contrast_sharpness_threshold: 0.75

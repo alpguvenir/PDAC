@@ -1,3 +1,8 @@
+# https://github.com/Ugenteraan/ResNet-50-CBAM-PyTorch/blob/main/models/resnet50.py
+
+# https://github.com/luuuyi/CBAM.PyTorch/blob/master/model/resnet_cbam.py -> check this also
+# https://github.com/elbuco1/CBAM
+# https://keras.io/examples/vision/3D_image_classification/
 
 import torch
 import torch.nn as nn

@@ -156,21 +156,41 @@ elif params_dict.get("data.label.name") == "Befund-Verlauf-Therapie-Procedere":
     file.close()
 
 
-print("Class label", params_dict.get("data.label.name"))
-print("Class shuffle version", params_dict.get("data.label.name.version"))
+with open(outputs_folder + "/log.txt", "w") as file:
+    print("Class label", params_dict.get("data.label.name"))
+    file.write("Class label " + params_dict.get("data.label.name") + "\n")
 
-print("# of 0s in train: ", train_ct_labels_list.count(0))
-print("# of 1s in train: ", train_ct_labels_list.count(1))
+    print("Class shuffle version", params_dict.get("data.label.name.version"))
+    file.write("Class shuffle version " + params_dict.get("data.label.name.version") + "\n")
 
-print("# of 0s in val: ", val_ct_labels_list.count(0))
-print("# of 1s in val: ", val_ct_labels_list.count(1))
+    print("# of 0s in train: ", train_ct_labels_list.count(0))
+    file.write("# of 0s in train: " + str(train_ct_labels_list.count(0)) + "\n")
 
-print("# of 0s in test: ", test_ct_labels_list.count(0))
-print("# of 1s in test: ", test_ct_labels_list.count(1))
+    print("# of 1s in train: ", train_ct_labels_list.count(1))
+    file.write("# of 1s in train: " + str(train_ct_labels_list.count(1)) + "\n")
+
+    print("# of 0s in val: ", val_ct_labels_list.count(0))
+    file.write("# of 0s in val: " + str(val_ct_labels_list.count(0)) + "\n")
+
+    print("# of 1s in val: ", val_ct_labels_list.count(1))
+    file.write("# of 1s in val: " + str(val_ct_labels_list.count(1)) + "\n")
+
+    print("# of 0s in test: ", test_ct_labels_list.count(0))
+    file.write("# of 0s in test: " + str(test_ct_labels_list.count(0)) + "\n")
+
+    print("# of 1s in test: ", test_ct_labels_list.count(1))    
+    file.write("# of 1s in test: " + str(test_ct_labels_list.count(1)) + "\n")
+
+    file.close()
+
 
 if params_dict.get("data.label.balanced"):
 
-    print("balanced...")
+    with open(outputs_folder + "/log.txt", "a") as file:
+        print("balanced...")
+        file.write("balanced..." + "\n")
+        file.close()
+
     # If data is set to be balanced, according to which class label has more instances
     # Shuffle the label that is in excess and train in a ratio of 1:1
     num_of_0s = train_ct_labels_list.count(0)
@@ -210,8 +230,14 @@ if params_dict.get("data.label.balanced"):
     ct_scan_list_balanced, ct_label_list_balanced = zip(*temp_ct_scan_label_list_balanced)
     train_ct_scans_list, train_ct_labels_list = list(ct_scan_list_balanced), list(ct_label_list_balanced)
     
-    print("# of 0s in train: ", train_ct_labels_list.count(0))
-    print("# of 1s in train: ", train_ct_labels_list.count(1))
+    with open(outputs_folder + "/log.txt", "a") as file:
+        print("# of 0s in train: ", train_ct_labels_list.count(0))
+        file.write("# of 0s in train: " + train_ct_labels_list.count(0) + "\n")
+
+        print("# of 1s in train: ", train_ct_labels_list.count(1))
+        file.write("# of 1s in train: " + train_ct_labels_list.count(1) + "\n")
+
+        file.close()
 
 # Transforms that need to be applied to the dataset
 transforms = {
@@ -256,7 +282,10 @@ model.to(device)
 
 
 get_params = lambda m: sum(p.numel() for p in m.parameters())
-print(f"Complete model has {get_params(model)} params")
+with open(outputs_folder + "/log.txt", "a") as file:
+    print(f"Complete model has {get_params(model)} params")
+    file.write("Complete model has " + str(get_params(model)) + " params" + "\n")
+    file.close()
 
 
 # loss and optimizer
@@ -264,11 +293,11 @@ sigmoid = nn.Sigmoid()
 metric = BinaryConfusionMatrix()
 
 # FIXME when training with pos_weight or not
-pos_weight_multiplier = 1
-pos_weight = (train_ct_labels_list.count(0) / train_ct_labels_list.count(1)) * pos_weight_multiplier
-criterion = nn.BCEWithLogitsLoss(pos_weight = torch.tensor(pos_weight))
+#pos_weight_multiplier = 0.95
+#pos_weight = (train_ct_labels_list.count(0) / train_ct_labels_list.count(1)) * pos_weight_multiplier
+#criterion = nn.BCEWithLogitsLoss(pos_weight = torch.tensor(pos_weight))
 # FIXME 
-#criterion = nn.BCEWithLogitsLoss()
+criterion = nn.BCEWithLogitsLoss()
 
 optimizer = optim.Adam(model.parameters(), lr=lr)
 sched = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[3, 4], gamma=0.01)
@@ -292,7 +321,11 @@ test_tp_0_mcc_array = []
 
 
 for epoch in range(NUM_EPOCHS):
-    print(f"Epoch: {epoch}")
+    with open(outputs_folder + "/log.txt", "a") as file:
+        print(f"Epoch: {epoch}")
+        file.write("Epoch: " + str(epoch) + "\n")
+        file.close()
+    
     total_train_loss = 0
     model.train()
 
@@ -357,15 +390,22 @@ for epoch in range(NUM_EPOCHS):
 
     sched.step()
 
-    print(f"\tMean train loss: {total_train_loss / len(train_loader):.2f}")
-    train_outputs, train_targets = torch.cat(train_outputs), torch.cat(train_targets)
+    with open(outputs_folder + "/log.txt", "a") as file:
+        print(f"\tMean train loss: {total_train_loss / len(train_loader):.2f}")
+        file.write("\tMean train loss: " +  "{:.2f}".format(total_train_loss / len(train_loader)) + "\n")
     
-    train_accuracy = torchmetrics.functional.accuracy(train_outputs, train_targets, task="binary")
-    train_mcc = torchmetrics.functional.classification.binary_matthews_corrcoef(train_outputs, train_targets)
-    print(f"\tTrain accuracy: {train_accuracy*100.0:.1f}%    Train MCC: {train_mcc*100.0:.1f}%")
+        train_outputs, train_targets = torch.cat(train_outputs), torch.cat(train_targets)
+        
+        train_accuracy = torchmetrics.functional.accuracy(train_outputs, train_targets, task="binary")
+        train_mcc = torchmetrics.functional.classification.binary_matthews_corrcoef(train_outputs, train_targets)
 
-    train_outputs = (train_outputs>0.5).float()
-    print('\t' + str(metric(train_outputs, train_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
+        print(f"\tTrain accuracy: {train_accuracy*100.0:.1f}%    Train MCC: {train_mcc*100.0:.1f}%")
+        file.write("\tTrain accuracy: " + "{:.1f}".format(train_accuracy*100.0) + "%    Train MCC: " + "{:.1f}".format(train_mcc*100.0) + "%" + "\n")
+        
+        train_outputs = (train_outputs>0.5).float()
+        print('\t' + str(metric(train_outputs, train_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
+        file.write('\t' + str(metric(train_outputs, train_targets).cpu().detach().numpy()).replace('\n', '\n\t') + "\n")
+        file.close()
 
 
     if(params_dict.get("data.label.name") == "Befund-Verlauf"):
@@ -374,14 +414,22 @@ for epoch in range(NUM_EPOCHS):
         train_tp_0_outputs, train_tp_0_targets = torch.cat(train_tp_0_outputs), torch.cat(train_tp_0_targets)
         train_tp_0_mcc = torchmetrics.functional.classification.binary_matthews_corrcoef(train_tp_0_outputs, train_tp_0_targets)
         
-        print('\t' + "Train Therapie-Procedere = 1 | 2 ", "MCC: ", "{:.1f}".format(train_tp_1_and_2_mcc*100), "%")
-        train_tp_1_and_2_outputs = (train_tp_1_and_2_outputs>0.5).float()
-        print('\t' + str(metric(train_tp_1_and_2_outputs, train_tp_1_and_2_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
+        with open(outputs_folder + "/log.txt", "a") as file:
+            print('\t' + "Train Therapie-Procedere = 1 | 2 ", "MCC: ", "{:.1f}".format(train_tp_1_and_2_mcc*100), "%")
+            file.write('\t' + "Train Therapie-Procedere = 1 | 2 " + "MCC: " + "{:.1f}".format(train_tp_1_and_2_mcc*100) + "%" + "\n")
 
-        print('\t' + "Train Therapie-Procedere = 0 ", "MCC: ", "{:.1f}".format(train_tp_0_mcc*100), "%")
-        train_tp_0_outputs = (train_tp_0_outputs>0.5).float()
-        print('\t' + str(metric(train_tp_0_outputs, train_tp_0_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
+            train_tp_1_and_2_outputs = (train_tp_1_and_2_outputs>0.5).float()
+            print('\t' + str(metric(train_tp_1_and_2_outputs, train_tp_1_and_2_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
+            file.write('\t' + str(metric(train_tp_1_and_2_outputs, train_tp_1_and_2_targets).cpu().detach().numpy()).replace('\n', '\n\t') + "\n")
 
+            print('\t' + "Train Therapie-Procedere = 0 ", "MCC: ", "{:.1f}".format(train_tp_0_mcc*100), "%")
+            file.write('\t' + "Train Therapie-Procedere = 0 " + "MCC: " + "{:.1f}".format(train_tp_0_mcc*100) + "%" + "\n")
+
+            train_tp_0_outputs = (train_tp_0_outputs>0.5).float()
+            print('\t' + str(metric(train_tp_0_outputs, train_tp_0_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
+            file.write('\t' + str(metric(train_tp_0_outputs, train_tp_0_targets).cpu().detach().numpy()).replace('\n', '\n\t') + "\n")            
+            file.close()
+        
         train_tp_1_and_2_mcc_array.append(train_tp_1_and_2_mcc)
         train_tp_0_mcc_array.append(train_tp_0_mcc)
 
@@ -412,17 +460,23 @@ for epoch in range(NUM_EPOCHS):
             validation_outputs.append(sigmoid(validation_output.cpu().flatten()))
             validation_targets.append(validation_target.flatten())
     
-    print(f"\n\tMean validation loss: {total_validation_loss / len(val_loader):.2f}")
-    validation_outputs, validation_targets = torch.cat(validation_outputs), torch.cat(validation_targets)
+    with open(outputs_folder + "/log.txt", "a") as file:
+        print(f"\n\tMean validation loss: {total_validation_loss / len(val_loader):.2f}")
+        file.write("\n\tMean validation loss: " +  "{:.2f}".format(total_validation_loss / len(val_loader)) + "\n")
+                
+        validation_outputs, validation_targets = torch.cat(validation_outputs), torch.cat(validation_targets)
+        
+        validation_accuracy = torchmetrics.functional.accuracy(validation_outputs, validation_targets, task="binary")
+        validation_mcc = torchmetrics.functional.classification.binary_matthews_corrcoef(validation_outputs, validation_targets)
+
+        print(f"\tValidation accuracy: {validation_accuracy*100.0:.1f}%    Validation MCC: {validation_mcc*100.0:.1f}%")    
+        file.write("\tValidation accuracy: " + "{:.1f}".format(validation_accuracy*100.0) + "%    Validation MCC: " + "{:.1f}".format(validation_mcc*100.0) + "%" + "\n")
+
+        validation_outputs = (validation_outputs>0.5).float()
+        print('\t' + str(metric(validation_outputs, validation_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
+        file.write('\t' + str(metric(validation_outputs, validation_targets).cpu().detach().numpy()).replace('\n', '\n\t') + "\n")
+        file.close()
     
-    validation_accuracy = torchmetrics.functional.accuracy(validation_outputs, validation_targets, task="binary")
-    validation_mcc = torchmetrics.functional.classification.binary_matthews_corrcoef(validation_outputs, validation_targets)
-
-    print(f"\tValidation accuracy: {validation_accuracy*100.0:.1f}%    Validation MCC: {validation_mcc*100.0:.1f}%")
-
-    validation_outputs = (validation_outputs>0.5).float()
-    print('\t' + str(metric(validation_outputs, validation_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
-
     validation_loss_array.append(total_validation_loss / len(val_loader))
     validation_accuracy_array.append(validation_accuracy)
     validation_mcc_array.append(validation_mcc)
@@ -466,15 +520,22 @@ for epoch in range(NUM_EPOCHS):
         
             test_iteration += 1
     
-    print(f"\n\tMean test loss: {total_test_loss / len(test_loader):.2f}")
-    test_outputs, test_targets = torch.cat(test_outputs), torch.cat(test_targets)
+    with open(outputs_folder + "/log.txt", "a") as file:
+        print(f"\n\tMean test loss: {total_test_loss / len(test_loader):.2f}")
+        file.write("\n\tMean test loss: " +  "{:.2f}".format(total_test_loss / len(test_loader)) + "\n")
     
-    test_accuracy = torchmetrics.functional.accuracy(test_outputs, test_targets, task="binary")
-    test_mcc = torchmetrics.functional.classification.binary_matthews_corrcoef(test_outputs, test_targets)
-    print(f"\tTest accuracy: {test_accuracy*100.0:.1f}%    Test MCC: {test_mcc*100.0:.1f}%")
+        test_outputs, test_targets = torch.cat(test_outputs), torch.cat(test_targets)
+        
+        test_accuracy = torchmetrics.functional.accuracy(test_outputs, test_targets, task="binary")
+        test_mcc = torchmetrics.functional.classification.binary_matthews_corrcoef(test_outputs, test_targets)
 
-    test_outputs = (test_outputs>0.5).float()
-    print('\t' + str(metric(test_outputs, test_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
+        print(f"\tTest accuracy: {test_accuracy*100.0:.1f}%    Test MCC: {test_mcc*100.0:.1f}%")
+        file.write("\tTest accuracy: " + "{:.1f}".format(test_accuracy*100.0) + "%    Test MCC: " + "{:.1f}".format(test_mcc*100.0) + "%" + "\n")
+        
+        test_outputs = (test_outputs>0.5).float()
+        print('\t' + str(metric(test_outputs, test_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
+        file.write('\t' + str(metric(test_outputs, test_targets).cpu().detach().numpy()).replace('\n', '\n\t') + "\n")
+        file.close()
     
 
     if(params_dict.get("data.label.name") == "Befund-Verlauf"):
@@ -483,13 +544,21 @@ for epoch in range(NUM_EPOCHS):
         test_tp_0_outputs, test_tp_0_targets = torch.cat(test_tp_0_outputs), torch.cat(test_tp_0_targets)
         test_tp_0_mcc = torchmetrics.functional.classification.binary_matthews_corrcoef(test_tp_0_outputs, test_tp_0_targets)
 
-        print('\t' + "Test Therapie-Procedere = 1 | 2", "MCC: ", "{:.1f}".format(test_tp_1_and_2_mcc*100), "%")
-        test_tp_1_and_2_outputs = (test_tp_1_and_2_outputs>0.5).float()
-        print('\t' + str(metric(test_tp_1_and_2_outputs, test_tp_1_and_2_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
+        with open(outputs_folder + "/log.txt", "a") as file:
+            print('\t' + "Test Therapie-Procedere = 1 | 2", "MCC: ", "{:.1f}".format(test_tp_1_and_2_mcc*100), "%")
+            file.write('\t' + "Test Therapie-Procedere = 1 | 2 " + "MCC: " + "{:.1f}".format(test_tp_1_and_2_mcc*100) + "%" + "\n")
 
-        print('\t' + "Test Therapie-Procedere = 0", "MCC: ", "{:.1f}".format(test_tp_0_mcc*100), "%")
-        test_tp_0_outputs = (test_tp_0_outputs>0.5).float()
-        print('\t' + str(metric(test_tp_0_outputs, test_tp_0_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
+            test_tp_1_and_2_outputs = (test_tp_1_and_2_outputs>0.5).float()
+            print('\t' + str(metric(test_tp_1_and_2_outputs, test_tp_1_and_2_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
+            file.write('\t' + str(metric(test_tp_1_and_2_outputs, test_tp_1_and_2_targets).cpu().detach().numpy()).replace('\n', '\n\t') + "\n")
+
+            print('\t' + "Test Therapie-Procedere = 0", "MCC: ", "{:.1f}".format(test_tp_0_mcc*100), "%")
+            file.write('\t' + "Test Therapie-Procedere = 0 " + "MCC: " + "{:.1f}".format(test_tp_0_mcc*100) + "%" + "\n")
+                        
+            test_tp_0_outputs = (test_tp_0_outputs>0.5).float()
+            print('\t' + str(metric(test_tp_0_outputs, test_tp_0_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
+            file.write('\t' + str(metric(test_tp_0_outputs, test_tp_0_targets).cpu().detach().numpy()).replace('\n', '\n\t') + "\n")            
+            file.close()
 
         test_tp_1_and_2_mcc_array.append(test_tp_1_and_2_mcc)
         test_tp_0_mcc_array.append(test_tp_0_mcc)
@@ -537,4 +606,7 @@ for epoch in range(NUM_EPOCHS):
     path_model = outputs_folder + "/model" + str(epoch) + ".pth"
     torch.save(model.state_dict(), path_model)
 
-    print("\n")
+    with open(outputs_folder + "/log.txt", "a") as file:
+        print("\n")
+        file.write("\n")
+        file.close()

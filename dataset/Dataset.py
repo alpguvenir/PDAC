@@ -39,6 +39,42 @@ class Dataset(torch.utils.data.Dataset):
         return len(self.ct_scans)
 
 
+    def augmentation(self,  ct_instance_layer_clipped_normalized_rotated_resized_cropped,
+                            horizontal_flip_prob, horizontal_flip_threshold, 
+                            translation_prob, translation_threshold, M, 
+                            gaussian_prob, gaussian_threshold, noise, amin, amax, 
+                            brightness_contrast_sharpness_prob, brightness_contrast_sharpness_threshold):
+
+        if self.train_mode and self.params_dict.get("data.augmentation"):
+
+            if horizontal_flip_prob > horizontal_flip_threshold:
+                ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.flip(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1)
+            
+            if translation_prob > translation_threshold:
+                print("translation")
+                ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.warpPerspective(ct_instance_layer_clipped_normalized_rotated_resized_cropped, M, 
+                                                                                                (ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[0], ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[1]))
+
+            # Dont do both, too much augmentation
+            if gaussian_prob > gaussian_threshold:
+                print("gaussiam")
+                ct_instance_layer_clipped_normalized_rotated_resized_cropped += noise
+                ct_instance_layer_clipped_normalized_rotated_resized_cropped = np.clip(ct_instance_layer_clipped_normalized_rotated_resized_cropped, amin, amax)
+                
+            elif brightness_contrast_sharpness_prob > brightness_contrast_sharpness_threshold:
+                print("brightness")
+                # B 0.9, C 1.3
+                ct_instance_layer_clipped_normalized_rotated_resized_cropped = torch.from_numpy(ct_instance_layer_clipped_normalized_rotated_resized_cropped).unsqueeze(0)
+                ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_brightness(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 0.9)
+                ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_contrast(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1.3)
+                ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_sharpness(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1.5)
+                ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized_cropped.squeeze(0)
+
+                ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized_cropped.detach().numpy()
+        
+        return ct_instance_layer_clipped_normalized_rotated_resized_cropped
+
+
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
         ct_scan, ct_label = (
             self.ct_scans[index],
@@ -66,14 +102,11 @@ class Dataset(torch.utils.data.Dataset):
         limit_max_number_of_layers = self.transforms['limit-max-number-of-layers']['bool']
         set_uniform_number_of_layers = self.transforms['uniform-number-of-layers']['bool']
         zero_pad_number_of_layers = self.transforms['zero-pad-number-of-layers']['bool']
-
-
         #assert limit_max_number_of_layers != set_uniform_number_of_layers, "Either there should be a maximum threshold or a uniform number of layers"
 
 
         # Open image by nibabel
         ct_instance = nib.load(ct_scan).get_fdata()
-        
 
         # H, W, Layers -> 512 x 512 x L
         ct_instance_shape = ct_instance.shape
@@ -138,39 +171,22 @@ class Dataset(torch.utils.data.Dataset):
                     #plt.close()
                     
                     ct_instance_layer_clipped_normalized_rotated = np.rot90(ct_instance_layer_clipped_normalized)
-                    #plt.imshow(ct_instance_layer_clippep_normalized_rotated, cmap='gray')
-                    #plt.savefig("/home/guevenira/attention_CT/development/src/data_slice_clip_normalize_rotate.png")
+                    #plt.imshow(ct_instance_layer_clipped_normalized_rotated, cmap='gray')
+                    #plt.savefig("/home/guevenira/attention_CT/PDAC/debugging/x1.png")
                     #plt.close()
                     
                     ct_instance_layer_clipped_normalized_rotated_resized = cv2.resize(ct_instance_layer_clipped_normalized_rotated, dsize=(height, width), interpolation=cv2.INTER_CUBIC)
 
                     ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized[crop_height_begin:crop_height_end, crop_width_begin:crop_width_end]
 
-
-                    if self.train_mode and self.params_dict.get("data.augmentation"):
-
-                        if horizontal_flip_prob > horizontal_flip_threshold:
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.flip(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1)
-                        
-                        if translation_prob > translation_threshold:
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.warpPerspective(ct_instance_layer_clipped_normalized_rotated_resized_cropped, M, 
-                                                                                                            (ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[0], ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[1]))
-
-                        # Dont do both, too much augmentation
-                        if gaussian_prob > gaussian_threshold:
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped += noise
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = np.clip(ct_instance_layer_clipped_normalized_rotated_resized_cropped, amin, amax)
-                            
-                        elif brightness_contrast_sharpness_prob > brightness_contrast_sharpness_threshold:
-                            # B 0.9, C 1.3
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = torch.from_numpy(ct_instance_layer_clipped_normalized_rotated_resized_cropped).unsqueeze(0)
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_brightness(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 0.9)
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_contrast(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1.3)
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_sharpness(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1.5)
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized_cropped.squeeze(0)
-
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized_cropped.detach().numpy()
-
+                    
+                    ct_instance_layer_clipped_normalized_rotated_resized_cropped = self.augmentation(       ct_instance_layer_clipped_normalized_rotated_resized_cropped,
+                                                                                                            horizontal_flip_prob, horizontal_flip_threshold, 
+                                                                                                            translation_prob, translation_threshold, M, 
+                                                                                                            gaussian_prob, gaussian_threshold, noise, amin, amax, 
+                                                                                                            brightness_contrast_sharpness_prob, brightness_contrast_sharpness_threshold)
+                    
+                    
                     if ct_instance_tensor == []:
                         ct_instance_tensor = torch.tensor(ct_instance_layer_clipped_normalized_rotated_resized_cropped.copy(), dtype=torch.float)
                         ct_instance_tensor = torch.unsqueeze(ct_instance_tensor, 0)
@@ -190,29 +206,12 @@ class Dataset(torch.utils.data.Dataset):
                     ct_instance_layer_clipped_normalized_rotated_resized = cv2.resize(ct_instance_layer_clipped_normalized_rotated, dsize=(height, width), interpolation=cv2.INTER_CUBIC)
                     ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized[crop_height_begin:crop_height_end, crop_width_begin:crop_width_end]
 
-                    if self.train_mode and self.params_dict.get("data.augmentation"):
 
-                        if horizontal_flip_prob > horizontal_flip_threshold:
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.flip(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1)
-                        
-                        if translation_prob > translation_threshold:
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.warpPerspective(ct_instance_layer_clipped_normalized_rotated_resized_cropped, M, 
-                                                                                                           (ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[0], ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[1]))
-
-                        # Dont do both, too much augmentation
-                        if gaussian_prob > gaussian_threshold:
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped += noise
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = np.clip(ct_instance_layer_clipped_normalized_rotated_resized_cropped, amin, amax)
-                            
-                        elif brightness_contrast_sharpness_prob > brightness_contrast_sharpness_threshold:
-                            # B 0.9, C 1.3
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = torch.from_numpy(ct_instance_layer_clipped_normalized_rotated_resized_cropped).unsqueeze(0)
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_brightness(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 0.9)
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_contrast(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1.3)
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_sharpness(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1.5)
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized_cropped.squeeze(0)
-
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized_cropped.detach().numpy()
+                    ct_instance_layer_clipped_normalized_rotated_resized_cropped = self.augmentation(       ct_instance_layer_clipped_normalized_rotated_resized_cropped,
+                                                                                                            horizontal_flip_prob, horizontal_flip_threshold, 
+                                                                                                            translation_prob, translation_threshold, M, 
+                                                                                                            gaussian_prob, gaussian_threshold, noise, amin, amax, 
+                                                                                                            brightness_contrast_sharpness_prob, brightness_contrast_sharpness_threshold)
 
 
                     if ct_instance_tensor == []:
@@ -243,29 +242,12 @@ class Dataset(torch.utils.data.Dataset):
                 ct_instance_layer_clipped_normalized_rotated_resized = cv2.resize(ct_instance_layer_clipped_normalized_rotated, dsize=(height, width), interpolation=cv2.INTER_CUBIC)
                 ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized[crop_height_begin:crop_height_end, crop_width_begin:crop_width_end]
 
-                if self.train_mode and self.params_dict.get("data.augmentation"):
 
-                    if horizontal_flip_prob > horizontal_flip_threshold:
-                        ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.flip(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1)
-                    
-                    if translation_prob > translation_threshold:
-                        ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.warpPerspective(ct_instance_layer_clipped_normalized_rotated_resized_cropped, M, 
-                                                                                                           (ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[0], ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[1]))
-                    
-                    # Dont do both, too much augmentation
-                    if gaussian_prob > gaussian_threshold:
-                        ct_instance_layer_clipped_normalized_rotated_resized_cropped += noise
-                        ct_instance_layer_clipped_normalized_rotated_resized_cropped = np.clip(ct_instance_layer_clipped_normalized_rotated_resized_cropped, amin, amax)
-                        
-                    elif brightness_contrast_sharpness_prob > brightness_contrast_sharpness_threshold:
-                        # B 0.9, C 1.3
-                        ct_instance_layer_clipped_normalized_rotated_resized_cropped = torch.from_numpy(ct_instance_layer_clipped_normalized_rotated_resized_cropped).unsqueeze(0)
-                        ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_brightness(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 0.9)
-                        ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_contrast(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1.3)
-                        ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_sharpness(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1.5)
-                        ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized_cropped.squeeze(0)
-
-                        ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized_cropped.detach().numpy()
+                ct_instance_layer_clipped_normalized_rotated_resized_cropped = self.augmentation(       ct_instance_layer_clipped_normalized_rotated_resized_cropped,
+                                                                                                        horizontal_flip_prob, horizontal_flip_threshold, 
+                                                                                                        translation_prob, translation_threshold, M, 
+                                                                                                        gaussian_prob, gaussian_threshold, noise, amin, amax, 
+                                                                                                        brightness_contrast_sharpness_prob, brightness_contrast_sharpness_threshold)
 
 
                 if ct_instance_tensor == []:
@@ -294,30 +276,13 @@ class Dataset(torch.utils.data.Dataset):
                     ct_instance_layer_clipped_normalized_rotated_resized = cv2.resize(ct_instance_layer_clipped_normalized_rotated, dsize=(height, width), interpolation=cv2.INTER_CUBIC)
                     ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized[crop_height_begin:crop_height_end, crop_width_begin:crop_width_end]
 
-                    if self.train_mode and self.params_dict.get("data.augmentation"):
-
-                        if horizontal_flip_prob > horizontal_flip_threshold:
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.flip(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1)
-                        
-                        if translation_prob > translation_threshold:
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.warpPerspective(ct_instance_layer_clipped_normalized_rotated_resized_cropped, M, 
-                                                                                                            (ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[0], ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[1]))
-
-                        # Dont do both, too much augmentation
-                        if gaussian_prob > gaussian_threshold:
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped += noise
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = np.clip(ct_instance_layer_clipped_normalized_rotated_resized_cropped, amin, amax)
-                            
-                        elif brightness_contrast_sharpness_prob > brightness_contrast_sharpness_threshold:
-                            # B 0.9, C 1.3
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = torch.from_numpy(ct_instance_layer_clipped_normalized_rotated_resized_cropped).unsqueeze(0)
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_brightness(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 0.9)
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_contrast(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1.3)
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_sharpness(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1.5)
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized_cropped.squeeze(0)
-
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized_cropped.detach().numpy()
-
+                    
+                    ct_instance_layer_clipped_normalized_rotated_resized_cropped = self.augmentation(       ct_instance_layer_clipped_normalized_rotated_resized_cropped,
+                                                                                                            horizontal_flip_prob, horizontal_flip_threshold, 
+                                                                                                            translation_prob, translation_threshold, M, 
+                                                                                                            gaussian_prob, gaussian_threshold, noise, amin, amax, 
+                                                                                                            brightness_contrast_sharpness_prob, brightness_contrast_sharpness_threshold)
+                    
 
                     if ct_instance_tensor == []:
                         ct_instance_tensor = torch.tensor(ct_instance_layer_clipped_normalized_rotated_resized_cropped.copy(), dtype=torch.float)
@@ -336,30 +301,13 @@ class Dataset(torch.utils.data.Dataset):
                     ct_instance_layer_clipped_normalized_rotated_resized = cv2.resize(ct_instance_layer_clipped_normalized_rotated, dsize=(height, width), interpolation=cv2.INTER_CUBIC)
                     ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized[crop_height_begin:crop_height_end, crop_width_begin:crop_width_end]
 
-                    if self.train_mode and self.params_dict.get("data.augmentation"):
-
-                        if horizontal_flip_prob > horizontal_flip_threshold:
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.flip(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1)
-                        
-                        if translation_prob > translation_threshold:
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.warpPerspective(ct_instance_layer_clipped_normalized_rotated_resized_cropped, M, 
-                                                                                                        (ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[0], ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[1]))
-                        
-                        # Dont do both, too much augmentation
-                        if gaussian_prob > gaussian_threshold:
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped += noise
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = np.clip(ct_instance_layer_clipped_normalized_rotated_resized_cropped, amin, amax)
-                            
-                        elif brightness_contrast_sharpness_prob > brightness_contrast_sharpness_threshold:
-                            # B 0.9, C 1.3
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = torch.from_numpy(ct_instance_layer_clipped_normalized_rotated_resized_cropped).unsqueeze(0)
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_brightness(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 0.9)
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_contrast(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1.3)
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_sharpness(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1.5)
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized_cropped.squeeze(0)
-
-                            ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized_cropped.detach().numpy()
-
+                    
+                    ct_instance_layer_clipped_normalized_rotated_resized_cropped = self.augmentation(       ct_instance_layer_clipped_normalized_rotated_resized_cropped,
+                                                                                                            horizontal_flip_prob, horizontal_flip_threshold, 
+                                                                                                            translation_prob, translation_threshold, M, 
+                                                                                                            gaussian_prob, gaussian_threshold, noise, amin, amax, 
+                                                                                                            brightness_contrast_sharpness_prob, brightness_contrast_sharpness_threshold)
+                    
 
                     if ct_instance_tensor == []:
                         ct_instance_tensor = torch.tensor(ct_instance_layer_clipped_normalized_rotated_resized_cropped.copy(), dtype=torch.float)

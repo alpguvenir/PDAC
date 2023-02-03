@@ -159,22 +159,22 @@ with open(outputs_folder + "/log.txt", "w") as file:
     file.write("Class shuffle version " + params_dict.get("data.label.name.version") + "\n")
 
     print("# of 0s in train: ", train_ct_labels_list.count(0))
-    file.write("# of 0s in train: " + train_ct_labels_list.count(0) + "\n")
+    file.write("# of 0s in train: " + str(train_ct_labels_list.count(0)) + "\n")
 
     print("# of 1s in train: ", train_ct_labels_list.count(1))
-    file.write("# of 1s in train: " + train_ct_labels_list.count(1) + "\n")
+    file.write("# of 1s in train: " + str(train_ct_labels_list.count(1)) + "\n")
 
     print("# of 0s in val: ", val_ct_labels_list.count(0))
-    file.write("# of 0s in val: " + val_ct_labels_list.count(0) + "\n")
+    file.write("# of 0s in val: " + str(val_ct_labels_list.count(0)) + "\n")
 
     print("# of 1s in val: ", val_ct_labels_list.count(1))
-    file.write("# of 1s in val: " + val_ct_labels_list.count(1) + "\n")
+    file.write("# of 1s in val: " + str(val_ct_labels_list.count(1)) + "\n")
 
     print("# of 0s in test: ", test_ct_labels_list.count(0))
-    file.write("# of 1s in test: " + test_ct_labels_list.count(0) + "\n")
+    file.write("# of 0s in test: " + str(test_ct_labels_list.count(0)) + "\n")
 
     print("# of 1s in test: ", test_ct_labels_list.count(1))    
-    file.write("# of 1s in val: " + test_ct_labels_list.count(1) + "\n")
+    file.write("# of 1s in test: " + str(test_ct_labels_list.count(1)) + "\n")
 
     file.close()
 
@@ -278,7 +278,7 @@ model.to(device)
 get_params = lambda m: sum(p.numel() for p in m.parameters())
 with open(outputs_folder + "/log.txt", "a") as file:
     print(f"Complete model has {get_params(model)} params")
-    file.write("Complete model has " + get_params(model) + "\n")
+    file.write("Complete model has " + str(get_params(model)) + " params" + "\n")
     file.close()
 
 
@@ -317,7 +317,7 @@ test_tp_0_mcc_array = []
 for epoch in range(NUM_EPOCHS):
     with open(outputs_folder + "/log.txt", "a") as file:
         print(f"Epoch: {epoch}")
-        file.write("Epoch: " + epoch + "\n")
+        file.write("Epoch: " + str(epoch) + "\n")
         file.close()
     
     total_train_loss = 0
@@ -391,7 +391,7 @@ for epoch in range(NUM_EPOCHS):
 
     with open(outputs_folder + "/log.txt", "a") as file:
         print(f"\tMean train loss: {total_train_loss / len(train_loader):.2f}")
-        file.write("\tMean train loss: " +  "{:.1f}".format(total_train_loss / len(train_loader)) + "\n")
+        file.write("\tMean train loss: " +  "{:.2f}".format(total_train_loss / len(train_loader)) + "\n")
     
         train_outputs, train_targets = torch.cat(train_outputs), torch.cat(train_targets)
         
@@ -461,7 +461,7 @@ for epoch in range(NUM_EPOCHS):
     
     with open(outputs_folder + "/log.txt", "a") as file:
         print(f"\n\tMean validation loss: {total_validation_loss / len(val_loader):.2f}")
-        file.write("\n\tMean validation loss: " +  "{:.1f}".format(total_validation_loss / len(val_loader)) + "\n")
+        file.write("\n\tMean validation loss: " +  "{:.2f}".format(total_validation_loss / len(val_loader)) + "\n")
                 
         validation_outputs, validation_targets = torch.cat(validation_outputs), torch.cat(validation_targets)
         
@@ -469,7 +469,7 @@ for epoch in range(NUM_EPOCHS):
         validation_mcc = torchmetrics.functional.classification.binary_matthews_corrcoef(validation_outputs, validation_targets)
 
         print(f"\tValidation accuracy: {validation_accuracy*100.0:.1f}%    Validation MCC: {validation_mcc*100.0:.1f}%")    
-        file.write("\Validation accuracy: " + "{:.1f}".format(validation_accuracy*100.0) + "%    Validation MCC: " + "{:.1f}".format(validation_mcc*100.0) + "%" + "\n")
+        file.write("\tValidation accuracy: " + "{:.1f}".format(validation_accuracy*100.0) + "%    Validation MCC: " + "{:.1f}".format(validation_mcc*100.0) + "%" + "\n")
 
         validation_outputs = (validation_outputs>0.5).float()
         print('\t' + str(metric(validation_outputs, validation_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
@@ -521,7 +521,7 @@ for epoch in range(NUM_EPOCHS):
     
     with open(outputs_folder + "/log.txt", "a") as file:
         print(f"\n\tMean test loss: {total_test_loss / len(test_loader):.2f}")
-        file.write("\n\tMean test loss: " +  "{:.1f}".format(total_test_loss / len(test_loader)) + "\n")
+        file.write("\n\tMean test loss: " +  "{:.2f}".format(total_test_loss / len(test_loader)) + "\n")
     
         test_outputs, test_targets = torch.cat(test_outputs), torch.cat(test_targets)
         
@@ -553,7 +553,7 @@ for epoch in range(NUM_EPOCHS):
 
             print('\t' + "Test Therapie-Procedere = 0", "MCC: ", "{:.1f}".format(test_tp_0_mcc*100), "%")
             file.write('\t' + "Test Therapie-Procedere = 0 " + "MCC: " + "{:.1f}".format(test_tp_0_mcc*100) + "%" + "\n")
-                        
+
             test_tp_0_outputs = (test_tp_0_outputs>0.5).float()
             print('\t' + str(metric(test_tp_0_outputs, test_tp_0_targets).cpu().detach().numpy()).replace('\n', '\n\t'))
             file.write('\t' + str(metric(test_tp_0_outputs, test_tp_0_targets).cpu().detach().numpy()).replace('\n', '\n\t') + "\n")            
