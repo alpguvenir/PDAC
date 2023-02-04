@@ -105,7 +105,7 @@ class CBAM(nn.Module):
 
 
 
-class ResNet152_CBAM_MultiheadAttention(nn.Module):
+class ResNet152_inter_layer_CBAM_MultiheadAttention(nn.Module):
     def __init__(self):
         super().__init__()
 

@@ -4,11 +4,11 @@ cst.label.csv: /home/guevenira/Data/shared/PDAC_CT/pseudonymised_patient_info.cs
 cts.label.problematic: /home/guevenira/Data/shared/Problematic_CTs
 
 
-#data.label.name: Geschlecht
-#data.label.name.version: geschlecht_v1
+data.label.name: Geschlecht
+data.label.name.version: geschlecht_v1
 
 
-data.label.name: Befund-Verlauf
+#data.label.name: Befund-Verlauf
 # 80% train, 10% validation, 10% test
 #data.label.name.version: befund_verlauf_v1
 
@@ -16,7 +16,7 @@ data.label.name: Befund-Verlauf
 #data.label.name.version: befund_verlauf_v2
 
 # 75% train, 10% validation, 15% test
-data.label.name.version: befund_verlauf_v3
+#data.label.name.version: befund_verlauf_v3
 
 
 #data.label.name: Befund-Verlauf-Therapie-Procedere

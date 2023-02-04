@@ -20,7 +20,7 @@ import torchmetrics
 from torchmetrics.classification import BinaryConfusionMatrix
 
 from dataset import Dataset
-from models.ResNet18.ResNet18_MultiheadAttention import ResNet18_MultiheadAttention
+#from models.ResNet18.ResNet18_MultiheadAttention import ResNet18_MultiheadAttention
 from models.ResNet18.ResNet18_MultiheadAttention_stats_False import ResNet18_MultiheadAttention_stats_False
 from models.ResNet18.ResNet18_sum import ResNet18_sum
 from models.ResNet18.ResNet18_mean import ResNet18_mean
@@ -35,11 +35,17 @@ from models.ResNet101.ResNet101_sum import ResNet101_sum
 
 from models.ResNet152.ResNet152_MultiheadAttention import ResNet152_MultiheadAttention
 from models.ResNet152.ResNet152_MultiheadAttention_stats_False import ResNet152_MultiheadAttention_stats_False
-from models.ResNet152.ResNet152_CBAM_MultiheadAttention import ResNet152_CBAM_MultiheadAttention
+from models.ResNet152.ResNet152_inter_layer_CBAM_MultiheadAttention import ResNet152_inter_layer_CBAM_MultiheadAttention
 
 from models.unofficial_ResNet50_CBAM.ResNet50_CBAM_MultiheadAttention_unoffficial import ResNet50_CBAM_MultiheadAttention_unoffficial
 
-from models.VGG16.VGG16_MultiheadAttention import VGG16_MultiheadAttention
+"""
+from models.ResNetXX_CBAM_MultiheadAttention.ResNet18_CBAM_MultiheadAttention import ResNet18_CBAM_MultiheadAttention
+from models.ResNetXX_CBAM_MultiheadAttention.ResNet152_CBAM_MultiheadAttention import ResNet152_CBAM_MultiheadAttention
+"""
+
+from models.ResNetXX_official_CBAM_MultiheadAttention.ResNet18_MultiheadAttention import ResNet18_MultiheadAttention
+from models.ResNetXX_official_CBAM_MultiheadAttention.ResNet152_CBAM_MultiheadAttention import ResNet152_CBAM_MultiheadAttention
 
 def get_file_paths(path):
     return glob.glob(path + "/*")
@@ -242,11 +248,11 @@ transforms = {
 
                 'Resize': {'height': 256, 'width': 256},    # Original CT layer sizes are 512 x 512
 
-                'Crop-Height' : {'begin': 16, 'end': 240},
-                'Crop-Width' : {'begin': 16, 'end': 240},
+                'Crop-Height' : {'begin': 0, 'end': 256},
+                'Crop-Width' : {'begin': 0, 'end': 256},
 
                 'limit-max-number-of-layers' : {'bool': True},
-                'Max-Layers' : {'max': 110},
+                'Max-Layers' : {'max': 200},
                 
                 'uniform-number-of-layers' : {'bool': False},
                 'Uniform-Layers': {'uniform': 200},
@@ -271,7 +277,7 @@ test_loader = DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE)
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-model = ResNet152_CBAM_MultiheadAttention()
+model = ResNet18_MultiheadAttention()
 model.to(device)
 
 
@@ -287,11 +293,12 @@ sigmoid = nn.Sigmoid()
 metric = BinaryConfusionMatrix()
 
 # FIXME when training with pos_weight or not
-pos_weight_multiplier = 0.95
-pos_weight = (train_ct_labels_list.count(0) / train_ct_labels_list.count(1)) * pos_weight_multiplier
-criterion = nn.BCEWithLogitsLoss(pos_weight = torch.tensor(pos_weight))
+# FOR ResNetXX_official_CBAM_MultiheadAttention.ResNet152_CBAM_MultiheadAttention use 1.1 for same effect with 1
+#pos_weight_multiplier = 1.1
+#pos_weight = (train_ct_labels_list.count(0) / train_ct_labels_list.count(1)) * pos_weight_multiplier
+#criterion = nn.BCEWithLogitsLoss(pos_weight = torch.tensor(pos_weight))
 # FIXME 
-#criterion = nn.BCEWithLogitsLoss()
+criterion = nn.BCEWithLogitsLoss()
 
 optimizer = optim.Adam(model.parameters(), lr=lr)
 sched = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[3, 4], gamma=0.01)

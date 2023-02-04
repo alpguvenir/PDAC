@@ -9,12 +9,33 @@ __all__ = ['ResNet', 'resnet18_cbam', 'resnet34_cbam', 'resnet50_cbam', 'resnet1
 
 
 model_urls = {
-    'resnet18': 'https://download.pytorch.org/models/resnet18-5c106cde.pth',
+    'resnet18': 'https://download.pytorch.org/models/resnet18-f37072fd.pth',
     'resnet34': 'https://download.pytorch.org/models/resnet34-333f7ec4.pth',
     'resnet50': 'https://download.pytorch.org/models/resnet50-19c8e357.pth',
     'resnet101': 'https://download.pytorch.org/models/resnet101-5d3b4d8f.pth',
-    'resnet152': 'https://download.pytorch.org/models/resnet152-b121ed2d.pth',
+    'resnet152': 'https://download.pytorch.org/models/resnet152-f82ba261.pth',
 }
+
+
+""" 
+# Weights provided in code
+model_urls = {
+    'resnet18'  :    'https://download.pytorch.org/models/resnet18-5c106cde.pth',
+    'resnet34'  :    'https://download.pytorch.org/models/resnet34-333f7ec4.pth',
+    'resnet50'  :    'https://download.pytorch.org/models/resnet50-19c8e357.pth',
+    'resnet101' :    'https://download.pytorch.org/models/resnet101-5d3b4d8f.pth',
+    'resnet152' :    'https://download.pytorch.org/models/resnet152-b121ed2d.pth',
+}
+
+# Weights of offical pytorch
+model_urls = {
+    'resnet18'  :    'https://download.pytorch.org/models/resnet18-f37072fd.pth',
+    'resnet34'  :    'https://download.pytorch.org/models/resnet34-b627a593.pth',
+    'resnet50'  :    'https://download.pytorch.org/models/resnet50-11ad3fa6.pth',
+    'resnet101' :    'https://download.pytorch.org/models/resnet101-cd907fc2.pth',
+    'resnet152' :    'https://download.pytorch.org/models/resnet152-f82ba261.pth',
+}
+"""
 
 """
 In official pytorch:
@@ -96,7 +117,7 @@ class BasicBlock(nn.Module):
         out = self.conv2(out)
         out = self.bn2(out)
 
-        out = self.ca(out) * out
+        #out = self.ca(out) * out
         out = self.sa(out) * out
 
         if self.downsample is not None:

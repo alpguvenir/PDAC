@@ -51,18 +51,15 @@ class Dataset(torch.utils.data.Dataset):
                 ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.flip(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1)
             
             if translation_prob > translation_threshold:
-                print("translation")
                 ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.warpPerspective(ct_instance_layer_clipped_normalized_rotated_resized_cropped, M, 
                                                                                                 (ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[0], ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[1]))
 
             # Dont do both, too much augmentation
             if gaussian_prob > gaussian_threshold:
-                print("gaussiam")
                 ct_instance_layer_clipped_normalized_rotated_resized_cropped += noise
                 ct_instance_layer_clipped_normalized_rotated_resized_cropped = np.clip(ct_instance_layer_clipped_normalized_rotated_resized_cropped, amin, amax)
                 
             elif brightness_contrast_sharpness_prob > brightness_contrast_sharpness_threshold:
-                print("brightness")
                 # B 0.9, C 1.3
                 ct_instance_layer_clipped_normalized_rotated_resized_cropped = torch.from_numpy(ct_instance_layer_clipped_normalized_rotated_resized_cropped).unsqueeze(0)
                 ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.adjust_brightness(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 0.9)
