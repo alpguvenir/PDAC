@@ -1,7 +1,7 @@
 import torch.nn as nn
 from torchvision import models
 from functools import partial
-from .ResNet import resnet152, ResNet152_Weights
+from .ResNet import resnet152_cbam
 
 class ResNet152_CBAM_MultiheadAttention(nn.Module):
     def __init__(self):
@@ -11,8 +11,7 @@ class ResNet152_CBAM_MultiheadAttention(nn.Module):
 
         hidden_size1 = 2048
 
-        
-        feature_extractor = resnet152(weights=ResNet152_Weights.DEFAULT)
+        feature_extractor = resnet152_cbam(pretrained=True)
 
 
         # Fully connected layer returning (hidden_size1) 256 units

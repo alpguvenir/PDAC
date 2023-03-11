@@ -20,13 +20,18 @@ import torchmetrics
 from torchmetrics.classification import BinaryConfusionMatrix
 
 from dataset import Dataset
-#from models.ResNet18.ResNet18_MultiheadAttention import ResNet18_MultiheadAttention
+from models.ResNet18.ResNet18_MultiheadAttention import ResNet18_MultiheadAttention
+from models.ResNet18.ResNet18_MultiheadAttention_v2 import ResNet18_MultiheadAttention_v2
+from models.ResNet18.ResNet18_MultiheadAttention_v3 import ResNet18_MultiheadAttention_v3
+from models.ResNet18.ResNet18_inter_layer_CBAM_MultiheadAttention import ResNet18_inter_layer_MultiheadAttention
+from models.ResNet18.ResNet18_maxpool_MultiheadAttention import ResNet18_maxpool_MultiheadAttention
 from models.ResNet18.ResNet18_MultiheadAttention_stats_False import ResNet18_MultiheadAttention_stats_False
 from models.ResNet18.ResNet18_sum import ResNet18_sum
 from models.ResNet18.ResNet18_mean import ResNet18_mean
 from models.ResNet18.ResNet18_Linear import ResNet18_Linear
 
 from models.ResNet50.ResNet50_MultiheadAttention import ResNet50_MultiheadAttention
+from models.ResNet50.ResNet50_maxpool_MultiheadAttention import ResNet50_maxpool_MultiheadAttention
 from models.ResNet50.ResNet50_MultiheadAttention_v2 import ResNet50_MultiheadAttention_v2
 from models.ResNet50.ResNet50_sum import ResNet50_sum
 
@@ -34,8 +39,13 @@ from models.ResNet101.ResNet101_MultiheadAttention import ResNet101_MultiheadAtt
 from models.ResNet101.ResNet101_sum import ResNet101_sum
 
 from models.ResNet152.ResNet152_MultiheadAttention import ResNet152_MultiheadAttention
+from models.ResNet152.ResNet152_MultiheadAttention_v2 import ResNet152_MultiheadAttention_v2
+from models.ResNet152.ResNet152_MultiheadAttention_v3 import ResNet152_MultiheadAttention_v3
+
+from models.ResNet152.ResNet152_maxpool_MultiheadAttention import ResNet152_maxpool_MultiheadAttention
 from models.ResNet152.ResNet152_MultiheadAttention_stats_False import ResNet152_MultiheadAttention_stats_False
 from models.ResNet152.ResNet152_inter_layer_CBAM_MultiheadAttention import ResNet152_inter_layer_CBAM_MultiheadAttention
+from models.ResNet152.ResNet152_inter_layer_CBAM_MultiheadAttention_v2 import ResNet152_inter_layer_MultiheadAttention_v2
 
 from models.unofficial_ResNet50_CBAM.ResNet50_CBAM_MultiheadAttention_unoffficial import ResNet50_CBAM_MultiheadAttention_unoffficial
 
@@ -44,8 +54,8 @@ from models.ResNetXX_CBAM_MultiheadAttention.ResNet18_CBAM_MultiheadAttention im
 from models.ResNetXX_CBAM_MultiheadAttention.ResNet152_CBAM_MultiheadAttention import ResNet152_CBAM_MultiheadAttention
 """
 
-from models.ResNetXX_official_CBAM_MultiheadAttention.ResNet18_MultiheadAttention import ResNet18_MultiheadAttention
-from models.ResNetXX_official_CBAM_MultiheadAttention.ResNet152_CBAM_MultiheadAttention import ResNet152_CBAM_MultiheadAttention
+#from models.ResNetXX_official_CBAM_MultiheadAttention.ResNet18_MultiheadAttention import ResNet18_MultiheadAttention
+#from models.ResNetXX_official_CBAM_MultiheadAttention.ResNet152_CBAM_MultiheadAttention import ResNet152_CBAM_MultiheadAttention
 
 def get_file_paths(path):
     return glob.glob(path + "/*")
@@ -248,17 +258,17 @@ transforms = {
 
                 'Resize': {'height': 256, 'width': 256},    # Original CT layer sizes are 512 x 512
 
-                'Crop-Height' : {'begin': 0, 'end': 256},
-                'Crop-Width' : {'begin': 0, 'end': 256},
+                'Crop-Height' : {'begin': 0, 'end': 256},  # 16 - 240     # 144 - 368
+                'Crop-Width' : {'begin': 0, 'end': 256},   # 16 - 240     # 144 - 368
 
                 'limit-max-number-of-layers' : {'bool': True},
                 'Max-Layers' : {'max': 200},
                 
                 'uniform-number-of-layers' : {'bool': False},
-                'Uniform-Layers': {'uniform': 200},
+                'Uniform-Layers': {'uniform': 110},
 
                 'zero-pad-number-of-layers' : {'bool': False},
-                'Zero-Pad-Layers' : {'zeropad': 200},
+                'Zero-Pad-Layers' : {'zeropad': 110},
             }
 
 # FIXME when training only on train instances or train + validation instances
@@ -277,7 +287,20 @@ test_loader = DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE)
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-model = ResNet18_MultiheadAttention()
+model = ResNet18_MultiheadAttention_v3()
+
+# ResNet18_MultiheadAttention
+#model.load_state_dict(torch.load('/home/guevenira/attention_CT/PDAC/results-train/ResNet18/geschlecht-1677099110/model4.pth'))
+
+# ResNet18_inter_layer_MultiheadAttention after layer 1
+#model.load_state_dict(torch.load('/home/guevenira/attention_CT/PDAC/results-train/ResNet18/geschlecht-1677199381/model6.pth'))
+
+# ResNet18_inter_layer_MultiheadAttention after layer 1 + layer 2
+#model.load_state_dict(torch.load('/home/guevenira/attention_CT/PDAC/results-train/ResNet18/geschlecht-1677236627/model9.pth'))
+
+# ResNet152_MultiheadAttention
+#model.load_state_dict(torch.load('/home/guevenira/attention_CT/PDAC/results-train/ResNet152/geschlecht-1677881541/model9.pth'))
+
 model.to(device)
 
 
@@ -293,8 +316,8 @@ sigmoid = nn.Sigmoid()
 metric = BinaryConfusionMatrix()
 
 # FIXME when training with pos_weight or not
-# FOR ResNetXX_official_CBAM_MultiheadAttention.ResNet152_CBAM_MultiheadAttention use 1.1 for same effect with 1
-#pos_weight_multiplier = 1.1
+# For ResNetXX_official_CBAM_MultiheadAttention.ResNet152_CBAM_MultiheadAttention use 1.1 for same effect with 1
+#pos_weight_multiplier = 1
 #pos_weight = (train_ct_labels_list.count(0) / train_ct_labels_list.count(1)) * pos_weight_multiplier
 #criterion = nn.BCEWithLogitsLoss(pos_weight = torch.tensor(pos_weight))
 # FIXME 
@@ -337,6 +360,31 @@ for epoch in range(NUM_EPOCHS):
             param.requires_grad = False
         model.feature_extractor.conv1[0].weight.requires_grad = True
         model.feature_extractor.conv1[0].bias.requires_grad = True
+        """
+        for name, param in model.named_parameters():
+            if param.requires_grad:
+                print (name)
+        """
+        #model.cbam_layer1.channel_attention.shared_mlp.requires_grad = True
+        #model.cbam_layer1.spatial_attention.spatial_attention.requires_grad = True
+
+        #model.cbam_layer2.channel_attention.shared_mlp.requires_grad = True
+        #model.cbam_layer2.spatial_attention.spatial_attention.requires_grad = True
+        
+        #Additional for the conv1 spatial attention for option 2.2
+        #model.feature_extractor.conv1_spatial.requires_grad_ = True
+
+        #Addditional for the maxpool spatial attention for option 1.2
+        # USE IT AS THE FOLLOWING FOR: models.ResNetXX_official_CBAM_MultiheadAttention.ResNet152_CBAM_MultiheadAttention
+        # as the conv2 and maxpool_spatial being implemented in the source code of ResNet
+        #model.feature_extractor.conv2.requires_grad_ = True
+        #model.feature_extractor.maxpool_spatial.requires_grad_ = True
+
+        # USE IT AS THE FOLLOWING FOR: models.ResNet152.ResNet152_maxpool_MultiheadAttention
+        #model.conv2.requires_grad_ = True
+        #model.maxpool_spatial.requires_grad_ = True
+        #model.maxpool_spatial.requires_grad_ = True
+    
     elif epoch == 1:
         model.feature_extractor.eval()
     elif epoch == 2:
@@ -351,6 +399,58 @@ for epoch in range(NUM_EPOCHS):
         for param in model.parameters():
             param.requires_grad = True
     
+    """
+    # Use this to observe which of the parameters are False / True
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            print name, param.data
+    """
+
+
+    """
+    if epoch == 0:
+        model.feature_extractor.eval()
+        for param in model.feature_extractor.parameters():
+            param.requires_grad = False
+        model.feature_extractor.conv1[0].weight.requires_grad = True
+        model.feature_extractor.conv1[0].bias.requires_grad = True
+    elif epoch == 1:
+        model.feature_extractor.eval()
+    elif epoch == 2:
+        pass
+    elif epoch > 2:
+        for param in model.parameters():
+            param.requires_grad = True
+    """
+
+    # Freesing weights -> this worked for Geschlecht EfficientNet_v2
+    """
+    model.feature_extractor.eval()
+    for param in model.feature_extractor.parameters():
+        param.requires_grad = False
+    model.feature_extractor.conv1[0].weight.requires_grad = True
+    model.feature_extractor.conv1[0].bias.requires_grad = True
+    """
+
+    # Not worked
+    """
+    if epoch == 0:
+        model.feature_extractor.eval()
+        for param in model.feature_extractor.parameters():
+            param.requires_grad = False
+        model.feature_extractor.conv1[0].weight.requires_grad = True
+        model.feature_extractor.conv1[0].bias.requires_grad = True
+        model.feature_extractor.fc.weight.requires_grad = True
+        model.feature_extractor.fc.bias.requires_grad = True
+    elif epoch > 0:
+        for param in model.parameters():
+            param.requires_grad = True
+    """ 
+
+    """
+    for param in model.parameters():
+        param.requires_grad = True
+    """
 
     #### TRAIN ####
     pbar_train_loop = tqdm(train_loader, total=len(train_loader), leave=False)

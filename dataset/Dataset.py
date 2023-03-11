@@ -5,6 +5,7 @@ import random
 
 import torch
 import torchvision.transforms.functional as F
+import torchvision.transforms as T
 import numpy as np
 from matplotlib import pyplot as plt
 
@@ -41,18 +42,44 @@ class Dataset(torch.utils.data.Dataset):
 
     def augmentation(self,  ct_instance_layer_clipped_normalized_rotated_resized_cropped,
                             horizontal_flip_prob, horizontal_flip_threshold, 
+                            vertical_flip_prob, vertical_flip_threshold,
                             translation_prob, translation_threshold, M, 
+                            shear_prob, shear_threshold, shear,
+                            rotation_prob, rotation_threshold, rotation_angle,
+                            gaussian_blur_prob, gaussian_blur_threshold,
                             gaussian_prob, gaussian_threshold, noise, amin, amax, 
                             brightness_contrast_sharpness_prob, brightness_contrast_sharpness_threshold):
 
         if self.train_mode and self.params_dict.get("data.augmentation"):
 
-            if horizontal_flip_prob > horizontal_flip_threshold:
+            if horizontal_flip_prob > horizontal_flip_threshold: # flipping from left to right
                 ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.flip(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 1)
+            elif vertical_flip_prob > vertical_flip_threshold: # flipping form bottom to top
+                ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.flip(ct_instance_layer_clipped_normalized_rotated_resized_cropped, 0)
             
+
             if translation_prob > translation_threshold:
                 ct_instance_layer_clipped_normalized_rotated_resized_cropped = cv2.warpPerspective(ct_instance_layer_clipped_normalized_rotated_resized_cropped, M, 
                                                                                                 (ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[0], ct_instance_layer_clipped_normalized_rotated_resized_cropped.shape[1]))
+
+            
+            # Shear
+            if shear_prob > shear_threshold:
+                ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.affine(torch.from_numpy(ct_instance_layer_clipped_normalized_rotated_resized_cropped).unsqueeze(0), angle=0, scale=1, translate=(0, 0), shear=shear)
+                ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized_cropped.squeeze(0).detach().numpy()
+
+
+            # 90 -> anticlockwise, -90 -> clockwise, 180
+            if rotation_prob > rotation_threshold:
+                ct_instance_layer_clipped_normalized_rotated_resized_cropped = F.rotate(torch.from_numpy(ct_instance_layer_clipped_normalized_rotated_resized_cropped).unsqueeze(0), rotation_angle)
+                ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized_cropped.squeeze(0).detach().numpy()
+            
+            
+            if gaussian_blur_prob > gaussian_blur_threshold:
+                gaussian_blur = T.GaussianBlur(kernel_size=(3, 3), sigma=(0.1, 2.0))
+                ct_instance_layer_clipped_normalized_rotated_resized_cropped = gaussian_blur(torch.from_numpy(ct_instance_layer_clipped_normalized_rotated_resized_cropped).unsqueeze(0))
+                ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized_cropped.squeeze(0).detach().numpy()
+            
 
             # Dont do both, too much augmentation
             if gaussian_prob > gaussian_threshold:
@@ -78,11 +105,50 @@ class Dataset(torch.utils.data.Dataset):
             self.ct_labels[index]   
         )
 
+        np.seterr(all='raise')
+
+        clip_prob = random.random()
+        clip_threshold = self.params_dict.get("data.augmentation.clip_threshold")
+
+        horizontal_flip_prob = random.random()
+        horizontal_flip_threshold = self.params_dict.get("data.augmentation.horizontal_flip_threshold")
+
+        vertical_flip_prob = random.random()
+        vertical_flip_threshold = self.params_dict.get("data.augmentation.vertical_flip_threshold")
+
+        translation_prob = random.random()
+        translation_threshold = self.params_dict.get("data.augmentation.translation_threshold")
+
+        shear_prob = random.random()
+        shear_threshold = self.params_dict.get("data.augmentation.shear_threshold")
+
+        rotation_prob = random.random()
+        rotation_threshold = self.params_dict.get("data.augmentation.rotation_threshold")
+
+        gaussian_blur_prob = random.random()
+        gaussian_blur_threshold = self.params_dict.get("data.augmentation.gaussian_blur_threshold")
+
+        gaussian_prob = random.random()
+        gaussian_threshold= self.params_dict.get("data.augmentation.gaussian_threshold")
+
+        brightness_contrast_sharpness_prob = random.random()
+        brightness_contrast_sharpness_threshold = self.params_dict.get("data.augmentation.brightness_contrast_sharpness_threshold")
+        ############################################
+
+        
         amin = self.transforms['Clip']['amin']
         amax = self.transforms['Clip']['amax']
 
-        lower_bound = self.transforms['Normalize']['bounds'][0]
-        upper_bound = self.transforms['Normalize']['bounds'][1]
+        if clip_prob > clip_threshold:
+            amin_shift = random.randint(-10, 10)
+            amax_shift = random.randint(-10, 10)
+            amin += amin_shift
+            amax += amax_shift
+
+        #lower_bound = self.transforms['Normalize']['bounds'][0]
+        #upper_bound = self.transforms['Normalize']['bounds'][1]
+        lower_bound = amin
+        upper_bound = amax
         
         height = self.transforms['Resize']['height']
         width = self.transforms['Resize']['width']
@@ -109,30 +175,37 @@ class Dataset(torch.utils.data.Dataset):
         ct_instance_shape = ct_instance.shape
         ct_instance_layer_number = ct_instance_shape[2]
 
-
-        horizontal_flip_prob = random.random()
-        horizontal_flip_threshold = self.params_dict.get("data.augmentation.horizontal_flip_threshold")
-
-        translation_prob = random.random()
-        translation_threshold = self.params_dict.get("data.augmentation.translation_threshold")
-
-        gaussian_prob = random.random()
-        gaussian_threshold= self.params_dict.get("data.augmentation.gaussian_threshold")
-
-        brightness_contrast_sharpness_prob = random.random()
-        brightness_contrast_sharpness_threshold = self.params_dict.get("data.augmentation.brightness_contrast_sharpness_threshold")
-
-        # Transformation matrix for translation
+        ########################################################
+        # Transformations matrix for translation
         horizontal_shift = random.randint(-5, 5)
         vertical_shift = random.randint(-5, 5)
 
         M = np.float32([[1, 0, horizontal_shift],     # Horizontal shift, - to left and + to right
-                        [0, 1, vertical_shift],   # Vertical shift, + to bottom and - to top
+                        [0, 1, vertical_shift],       # Vertical shift, + to bottom and - to top
                         [0, 0, 1]])
 
+
+        # Transofrmations for shear
+        x_shear = random.randint(-5, 5)
+        y_shear = random.randint(-5, 5)
+        shear = (x_shear, y_shear)
+
+
+        # Transformations for rotation
+        rotation_angle_selection = random.random()
+        if rotation_angle_selection >= 0.33:
+            rotation_angle = 90
+        elif rotation_angle_selection >= 0.67:
+            rotation_angle = -90
+        else:
+            rotation_angle = 180
+
+
+        # Transformations for gaussian noise
         mean = 0
         variance = 0.05
         noise = np.random.normal(mean, variance, [crop_height_end - crop_height_begin, crop_width_end - crop_width_begin]) 
+        ########################################################
 
         ct_instance_tensor = []
 
@@ -175,14 +248,23 @@ class Dataset(torch.utils.data.Dataset):
                     ct_instance_layer_clipped_normalized_rotated_resized = cv2.resize(ct_instance_layer_clipped_normalized_rotated, dsize=(height, width), interpolation=cv2.INTER_CUBIC)
 
                     ct_instance_layer_clipped_normalized_rotated_resized_cropped = ct_instance_layer_clipped_normalized_rotated_resized[crop_height_begin:crop_height_end, crop_width_begin:crop_width_end]
-
+                    #plt.imshow(ct_instance_layer_clipped_normalized_rotated_resized_cropped, cmap='gray')
+                    #plt.savefig("/home/guevenira/attention_CT/PDAC/debugging/1before.png")
+                    #plt.close()
                     
                     ct_instance_layer_clipped_normalized_rotated_resized_cropped = self.augmentation(       ct_instance_layer_clipped_normalized_rotated_resized_cropped,
                                                                                                             horizontal_flip_prob, horizontal_flip_threshold, 
+                                                                                                            vertical_flip_prob, vertical_flip_threshold,
                                                                                                             translation_prob, translation_threshold, M, 
+                                                                                                            shear_prob, shear_threshold, shear,
+                                                                                                            rotation_prob, rotation_threshold, rotation_angle,
+                                                                                                            gaussian_blur_prob, gaussian_blur_threshold,
                                                                                                             gaussian_prob, gaussian_threshold, noise, amin, amax, 
                                                                                                             brightness_contrast_sharpness_prob, brightness_contrast_sharpness_threshold)
-                    
+                    #plt.imshow(ct_instance_layer_clipped_normalized_rotated_resized_cropped, cmap='gray')
+                    #plt.savefig("/home/guevenira/attention_CT/PDAC/debugging/1after.png")
+                    #plt.close()
+                    #exit()            
                     
                     if ct_instance_tensor == []:
                         ct_instance_tensor = torch.tensor(ct_instance_layer_clipped_normalized_rotated_resized_cropped.copy(), dtype=torch.float)
@@ -206,7 +288,11 @@ class Dataset(torch.utils.data.Dataset):
 
                     ct_instance_layer_clipped_normalized_rotated_resized_cropped = self.augmentation(       ct_instance_layer_clipped_normalized_rotated_resized_cropped,
                                                                                                             horizontal_flip_prob, horizontal_flip_threshold, 
+                                                                                                            vertical_flip_prob, vertical_flip_threshold,
                                                                                                             translation_prob, translation_threshold, M, 
+                                                                                                            shear_prob, shear_threshold, shear,
+                                                                                                            rotation_prob, rotation_threshold, rotation_angle,
+                                                                                                            gaussian_blur_prob, gaussian_blur_threshold,
                                                                                                             gaussian_prob, gaussian_threshold, noise, amin, amax, 
                                                                                                             brightness_contrast_sharpness_prob, brightness_contrast_sharpness_threshold)
 
@@ -242,7 +328,11 @@ class Dataset(torch.utils.data.Dataset):
 
                 ct_instance_layer_clipped_normalized_rotated_resized_cropped = self.augmentation(       ct_instance_layer_clipped_normalized_rotated_resized_cropped,
                                                                                                         horizontal_flip_prob, horizontal_flip_threshold, 
+                                                                                                        vertical_flip_prob, vertical_flip_threshold,
                                                                                                         translation_prob, translation_threshold, M, 
+                                                                                                        shear_prob, shear_threshold, shear,
+                                                                                                        rotation_prob, rotation_threshold, rotation_angle,
+                                                                                                        gaussian_blur_prob, gaussian_blur_threshold,
                                                                                                         gaussian_prob, gaussian_threshold, noise, amin, amax, 
                                                                                                         brightness_contrast_sharpness_prob, brightness_contrast_sharpness_threshold)
 
@@ -276,7 +366,11 @@ class Dataset(torch.utils.data.Dataset):
                     
                     ct_instance_layer_clipped_normalized_rotated_resized_cropped = self.augmentation(       ct_instance_layer_clipped_normalized_rotated_resized_cropped,
                                                                                                             horizontal_flip_prob, horizontal_flip_threshold, 
+                                                                                                            vertical_flip_prob, vertical_flip_threshold,
                                                                                                             translation_prob, translation_threshold, M, 
+                                                                                                            shear_prob, shear_threshold, shear,
+                                                                                                            rotation_prob, rotation_threshold, rotation_angle,
+                                                                                                            gaussian_blur_prob, gaussian_blur_threshold,
                                                                                                             gaussian_prob, gaussian_threshold, noise, amin, amax, 
                                                                                                             brightness_contrast_sharpness_prob, brightness_contrast_sharpness_threshold)
                     
@@ -301,7 +395,11 @@ class Dataset(torch.utils.data.Dataset):
                     
                     ct_instance_layer_clipped_normalized_rotated_resized_cropped = self.augmentation(       ct_instance_layer_clipped_normalized_rotated_resized_cropped,
                                                                                                             horizontal_flip_prob, horizontal_flip_threshold, 
+                                                                                                            vertical_flip_prob, vertical_flip_threshold,
                                                                                                             translation_prob, translation_threshold, M, 
+                                                                                                            shear_prob, shear_threshold, shear,
+                                                                                                            rotation_prob, rotation_threshold, rotation_angle,
+                                                                                                            gaussian_blur_prob, gaussian_blur_threshold,
                                                                                                             gaussian_prob, gaussian_threshold, noise, amin, amax, 
                                                                                                             brightness_contrast_sharpness_prob, brightness_contrast_sharpness_threshold)
                     

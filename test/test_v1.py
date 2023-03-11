@@ -32,6 +32,12 @@ from models.ResNet18.ResNet18_Linear import ResNet18_Linear
 from models.ResNet101.ResNet101_MultiheadAttention import ResNet101_MultiheadAttention
 from models.ResNet101.ResNet101_sum import ResNet101_sum
 
+from models.ResNetXX_CBAM_MultiheadAttention.ResNet18_CBAM_MultiheadAttention import ResNet18_CBAM_MultiheadAttention
+from models.ResNetXX_official_CBAM_MultiheadAttention.ResNet152_CBAM_MultiheadAttention import ResNet152_CBAM_MultiheadAttention
+
+from models.ResNet152.ResNet152_inter_layer_CBAM_MultiheadAttention import ResNet152_inter_layer_CBAM_MultiheadAttention
+
+from models.ResNet152.ResNet152_MultiheadAttention import ResNet152_MultiheadAttention
 
 import torchmetrics
 from torchmetrics.classification import BinaryConfusionMatrix
@@ -154,30 +160,33 @@ transforms = {
 
                 'Resize': {'height': 256, 'width': 256},    # Original CT layer sizes are 512 x 512
 
-                'Crop-Height' : {'begin': 0, 'end': 256},
-                'Crop-Width' : {'begin': 0, 'end': 256},
+                'Crop-Height' : {'begin': 16, 'end': 240},  # 16 - 240
+                'Crop-Width' : {'begin': 16, 'end': 240},   # 16 - 240
 
-                'limit-max-number-of-layers' : {'bool': True},
-                'Max-Layers' : {'max': 100},
+                'limit-max-number-of-layers' : {'bool': False},
+                'Max-Layers' : {'max': 110},
                 
                 'uniform-number-of-layers' : {'bool': False},
                 'Uniform-Layers': {'uniform': 200},
+
+                'zero-pad-number-of-layers' : {'bool': True},
+                'Zero-Pad-Layers' : {'zeropad': 110},
             }
 
 
 
 
+val_dataset = Dataset.Dataset(val_ct_scans_list, val_ct_labels_list, transforms=transforms, train_mode = False)
 test_dataset = Dataset.Dataset(test_ct_scans_list, test_ct_labels_list, transforms=transforms, train_mode = False)
 
+val_loader = DataLoader(dataset=val_dataset, batch_size=BATCH_SIZE)
 test_loader = DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE)
 
 
 # Use gpu if exists
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-
-model = ResNet101_MultiheadAttention()
-model.load_state_dict(torch.load('/home/guevenira/attention_CT/PDAC/results-train/befund_verlauf-1674124609/model4.pth'))
+model = ResNet152_MultiheadAttention()
+model.load_state_dict(torch.load('/home/guevenira/attention_CT/PDAC/results-train/befund_verlauf-1676761327/model9.pth'))
 model.to(device)
 
 
@@ -185,6 +194,11 @@ model.to(device)
 sigmoid = nn.Sigmoid()
 criterion = nn.BCEWithLogitsLoss()
 
+####
+#pos_weight_multiplier = 1
+#pos_weight = (train_ct_labels_list.count(0) / train_ct_labels_list.count(1)) * pos_weight_multiplier
+#criterion = nn.BCEWithLogitsLoss(pos_weight = torch.tensor(pos_weight))
+####
 
 #### TEST ####
 model.eval()
@@ -197,13 +211,11 @@ sampled1 = False
 sampled0 = False
 
 with torch.no_grad():
-    for test_input, test_target in tqdm(test_loader, leave=False):
+    for test_input, test_target in tqdm(val_loader, leave=False):
 
         test_input = test_input.permute(2, 0, 1, 3, 4)
         test_input = torch.squeeze(test_input, 1)
 
-        # Use only with models with attention
-        #test_output, att_map = model(test_input.to(device))
         test_output = model(test_input.to(device))
 
         test_loss = criterion(test_output, torch.unsqueeze(test_target, 0).float().to(device))
@@ -248,7 +260,7 @@ with torch.no_grad():
                 plt.savefig(outputs_folder + "/1-pred-1_layer_0th.png")
                 plt.close()
 
-                cl_layer = test_input[199, :, :, :]                
+                cl_layer = test_input[109, :, :, :]                
                 cl_layer = cl_layer.permute(1, 2, 0)
                 plt.imshow(cl_layer, cmap='gray')
                 plt.savefig(outputs_folder + "/1-pred-1_layer_199th.png")
@@ -285,7 +297,7 @@ with torch.no_grad():
                 plt.savefig(outputs_folder + "/0-pred-0_layer_0th.png")
                 plt.close()
 
-                cl_layer = test_input[199, :, :, :]                
+                cl_layer = test_input[109, :, :, :]                
                 cl_layer = cl_layer.permute(1, 2, 0)
                 plt.imshow(cl_layer, cmap='gray')
                 plt.savefig(outputs_folder + "/0-pred-0_layer_199th.png")
@@ -293,7 +305,7 @@ with torch.no_grad():
                 sampled0 = True
             
 
-print(f"\tMean test loss: {total_test_loss / len(test_loader):.2f}")
+print(f"\tMean test loss: {total_test_loss / len(val_loader):.2f}")
 test_outputs, test_targets = torch.cat(test_outputs), torch.cat(test_targets)
 
 test_accuracy = torchmetrics.functional.accuracy(test_outputs, test_targets, task="binary")

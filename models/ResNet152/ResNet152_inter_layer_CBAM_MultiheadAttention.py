@@ -133,8 +133,8 @@ class ResNet152_inter_layer_CBAM_MultiheadAttention(nn.Module):
 
         self.cbam_layer1 = CBAM(channel_in=256)
         self.cbam_layer2 = CBAM(channel_in=512)
-        self.cbam_layer3 = CBAM(channel_in=1024)
-        self.cbam_layer4 = CBAM(channel_in=2048)
+        #self.cbam_layer3 = CBAM(channel_in=1024)
+        #self.cbam_layer4 = CBAM(channel_in=2048)
 
         self.feature_extractor = feature_extractor
         

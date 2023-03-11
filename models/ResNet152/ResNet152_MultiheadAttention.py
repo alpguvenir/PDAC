@@ -11,6 +11,7 @@ class ResNet152_MultiheadAttention(nn.Module):
         hidden_size1 = 2048
         
         feature_extractor = models.resnet.resnet152(weights=models.ResNet152_Weights.DEFAULT)
+        #feature_extractor = models.resnet.resnet152(weights=None)
 
         # Fully connected layer returning (hidden_size1) 256 units
         # fc contains 1000 nodes at the end, so override it to keep the same number of nodes as in_features = 2048
@@ -59,7 +60,9 @@ class ResNet152_MultiheadAttention(nn.Module):
         #[batch size, 1, 2048]
         
         query = features.mean(0, keepdims=True)
-
+        #print(features.shape)                           # [110, 1, 2048
+        #print(query.shape)                              # [1, 1, 2048]
+        
         #print("query.shape", query.shape)
         
         features, att_map = self.att(query, features, features)

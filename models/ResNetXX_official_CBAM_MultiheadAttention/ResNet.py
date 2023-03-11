@@ -4,12 +4,64 @@ from typing import Any, Callable, List, Optional, Type, Union
 import torch
 import torch.nn as nn
 from torch import Tensor
+import torch.utils.model_zoo as model_zoo
 
 from torchvision.transforms._presets import ImageClassification
 from torchvision.utils import _log_api_usage_once
 from torchvision.models._api import register_model, Weights, WeightsEnum
 from torchvision.models._meta import _IMAGENET_CATEGORIES
 from torchvision.models._utils import _ovewrite_named_param, handle_legacy_interface
+
+
+class ChannelAttention(nn.Module):
+    def __init__(self, in_planes, ratio=16):
+        super(ChannelAttention, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.max_pool = nn.AdaptiveMaxPool2d(1)
+           
+        self.fc = nn.Sequential(nn.Conv2d(in_planes, in_planes // 16, 1, bias=False),
+                               nn.ReLU(),
+                               nn.Conv2d(in_planes // 16, in_planes, 1, bias=False))
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = self.fc(self.avg_pool(x))
+        max_out = self.fc(self.max_pool(x))
+        out = avg_out + max_out
+        return self.sigmoid(out)
+
+
+class SpatialAttention(nn.Module):
+    def __init__(self, kernel_size=7):
+        super(SpatialAttention, self).__init__()
+
+        self.conv1 = nn.Conv2d(2, 1, kernel_size, padding=kernel_size//2, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = torch.mean(x, dim=1, keepdim=True)
+        max_out, _ = torch.max(x, dim=1, keepdim=True)
+        x = torch.cat([avg_out, max_out], dim=1)
+        x = self.conv1(x)
+        return self.sigmoid(x)
+
+
+# self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+class MaxpoolSpatialAttention(nn.Module):
+    def __init__(self):
+        super(MaxpoolSpatialAttention, self).__init__()
+
+        # self.conv1 = nn.Conv2d(2, 1, kernel_size=3, stride=1, padding=1, bias=False)
+        # self.conv1 = nn.Conv2d(2, 1, kernel_size=1, stride=1, padding=0, bias=False)
+        self.conv1 = nn.Conv2d(2, 1, kernel_size=1, stride=1, padding=0, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = torch.mean(x, dim=1, keepdim=True)
+        max_out, _ = torch.max(x, dim=1, keepdim=True)
+        x = torch.cat([avg_out, max_out], dim=1)
+        x = self.conv1(x)
+        return self.sigmoid(x)
 
 
 __all__ = [
@@ -69,6 +121,7 @@ class BasicBlock(nn.Module):
         base_width: int = 64,
         dilation: int = 1,
         norm_layer: Optional[Callable[..., nn.Module]] = None,
+        use_cbam: bool = False,
     ) -> None:
         super().__init__()
         if norm_layer is None:
@@ -83,6 +136,12 @@ class BasicBlock(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         self.conv2 = conv3x3(planes, planes)
         self.bn2 = norm_layer(planes)
+
+        self.use_cbam = use_cbam
+        if self.use_cbam:
+            self.ca = ChannelAttention(planes * self.expansion)
+            self.sa = SpatialAttention()
+
         self.downsample = downsample
         self.stride = stride
 
@@ -95,6 +154,10 @@ class BasicBlock(nn.Module):
 
         out = self.conv2(out)
         out = self.bn2(out)
+
+        if self.use_cbam:
+            out = self.ca(out) * out
+            out = self.sa(out) * out
 
         if self.downsample is not None:
             identity = self.downsample(x)
@@ -124,6 +187,7 @@ class Bottleneck(nn.Module):
         base_width: int = 64,
         dilation: int = 1,
         norm_layer: Optional[Callable[..., nn.Module]] = None,
+        use_cbam: bool = False,
     ) -> None:
         super().__init__()
         if norm_layer is None:
@@ -131,12 +195,28 @@ class Bottleneck(nn.Module):
         width = int(planes * (base_width / 64.0)) * groups
         # Both self.conv2 and self.downsample layers downsample the input when stride != 1
         self.conv1 = conv1x1(inplanes, width)
+
+        """Option 3.1 EXTENSION """
+        #self.conv1_spatial = MaxpoolSpatialAttention()
+        """Option 3.1"""
+
         self.bn1 = norm_layer(width)
         self.conv2 = conv3x3(width, width, stride, groups, dilation)
         self.bn2 = norm_layer(width)
         self.conv3 = conv1x1(width, planes * self.expansion)
+
+        """Option 4.1 EXTENSION """
+        #self.conv3_spatial = MaxpoolSpatialAttention()
+        """Option 4.1"""
+
         self.bn3 = norm_layer(planes * self.expansion)
         self.relu = nn.ReLU(inplace=True)
+        
+        self.use_cbam = use_cbam
+        if self.use_cbam:
+            #self.ca = ChannelAttention(planes * self.expansion)
+            self.sa = SpatialAttention()
+    
         self.downsample = downsample
         self.stride = stride
 
@@ -144,6 +224,11 @@ class Bottleneck(nn.Module):
         identity = x
 
         out = self.conv1(x)
+
+        """Option 3.1 EXTENSION """
+        #out = self.conv1_spatial(out) * out
+        """Option 3.1"""
+
         out = self.bn1(out)
         out = self.relu(out)
 
@@ -152,8 +237,17 @@ class Bottleneck(nn.Module):
         out = self.relu(out)
 
         out = self.conv3(out)
+
+        """Option 4.1 EXTENSION """
+        #out = self.conv3_spatial(out) * out
+        """Option 4.1"""
+
         out = self.bn3(out)
 
+        if self.use_cbam:            
+            #out = self.ca(out) * out
+            out = self.sa(out) * out
+            
         if self.downsample is not None:
             identity = self.downsample(x)
 
@@ -193,14 +287,37 @@ class ResNet(nn.Module):
             )
         self.groups = groups
         self.base_width = width_per_group
+        
+        """Option 2.1 ORIGINAL """
         self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3, bias=False)
+        """Option 2.1"""
+
+
+        """Option 2.2"""
+        #self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3, bias=False)
+        #self.conv1_spatial = MaxpoolSpatialAttention()
+        """Option 2.2"""
+
+
         self.bn1 = norm_layer(self.inplanes)
         self.relu = nn.ReLU(inplace=True)
+
+
+        """Option 1.1 ORIGINAL """
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.layer1 = self._make_layer(block, 64, layers[0])
-        self.layer2 = self._make_layer(block, 128, layers[1], stride=2, dilate=replace_stride_with_dilation[0])
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=2, dilate=replace_stride_with_dilation[1])
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=2, dilate=replace_stride_with_dilation[2])
+        """Option 1.1"""
+
+
+        """Option 1.2"""
+        #self.conv2 = nn.Conv2d(self.inplanes, self.inplanes, kernel_size=7, stride=2, padding=3, bias=False)
+        #self.maxpool_spatial = MaxpoolSpatialAttention()
+        """Option 1.2"""
+
+
+        self.layer1 = self._make_layer(block, 64, layers[0], use_cbam=False)
+        self.layer2 = self._make_layer(block, 128, layers[1], stride=2, dilate=replace_stride_with_dilation[0], use_cbam=False)
+        self.layer3 = self._make_layer(block, 256, layers[2], stride=2, dilate=replace_stride_with_dilation[1], use_cbam=False)
+        self.layer4 = self._make_layer(block, 512, layers[3], stride=2, dilate=replace_stride_with_dilation[2], use_cbam=False)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(512 * block.expansion, num_classes)
 
@@ -228,6 +345,7 @@ class ResNet(nn.Module):
         blocks: int,
         stride: int = 1,
         dilate: bool = False,
+        use_cbam: bool = False,
     ) -> nn.Sequential:
         norm_layer = self._norm_layer
         downsample = None
@@ -244,7 +362,7 @@ class ResNet(nn.Module):
         layers = []
         layers.append(
             block(
-                self.inplanes, planes, stride, downsample, self.groups, self.base_width, previous_dilation, norm_layer
+                self.inplanes, planes, stride, downsample, self.groups, self.base_width, previous_dilation, norm_layer, use_cbam
             )
         )
         self.inplanes = planes * block.expansion
@@ -264,10 +382,36 @@ class ResNet(nn.Module):
 
     def _forward_impl(self, x: Tensor) -> Tensor:
         # See note [TorchScript super()]
+        """Option 2.1 ORIGINAL """
         x = self.conv1(x)
+        # [110, 64, 112, 112]
+        """Option 2.1"""
+        
+
+        """Option 2.2"""
+        #x = self.conv1(x)                   # [110, 64, 112, 112]
+        #x = self.conv1_spatial(x) * x       # [110, 64, 112, 112]
+        """Option 2.2"""
+        
+
         x = self.bn1(x)
         x = self.relu(x)
+        
+
+        """Option 1.1 ORIGINAL """       
+        #   before maxpool x is             # ([110, 64, 112, 112]) -> ([110, 64, 56, 56]) for layer1
         x = self.maxpool(x)
+        # ([110, 64, 56, 56])
+        """Option 1.1"""       
+
+
+        """Option 1.2"""
+        #   self.conv2(x)                   # ([110, 64, 56, 56])
+        #   self.maxpool_spatial(x) * x     # self.maxpool_spatial(x) and x ([110, 1, 56, 56])
+        #x = self.conv2(x)
+        #x = self.maxpool_spatial(x) * x
+        """Option 1.2"""
+
 
         x = self.layer1(x)
         x = self.layer2(x)
@@ -794,9 +938,7 @@ def resnet152(*, weights: Optional[ResNet152_Weights] = None, progress: bool = T
 
 #@register_model()
 @handle_legacy_interface(weights=("pretrained", ResNeXt50_32X4D_Weights.IMAGENET1K_V1))
-def resnext50_32x4d(
-    *, weights: Optional[ResNeXt50_32X4D_Weights] = None, progress: bool = True, **kwargs: Any
-) -> ResNet:
+def resnext50_32x4d(*, weights: Optional[ResNeXt50_32X4D_Weights] = None, progress: bool = True, **kwargs: Any) -> ResNet:
     """ResNeXt-50 32x4d model from
     `Aggregated Residual Transformation for Deep Neural Networks <https://arxiv.org/abs/1611.05431>`_.
 
@@ -824,9 +966,7 @@ def resnext50_32x4d(
 
 #@register_model()
 @handle_legacy_interface(weights=("pretrained", ResNeXt101_32X8D_Weights.IMAGENET1K_V1))
-def resnext101_32x8d(
-    *, weights: Optional[ResNeXt101_32X8D_Weights] = None, progress: bool = True, **kwargs: Any
-) -> ResNet:
+def resnext101_32x8d(*, weights: Optional[ResNeXt101_32X8D_Weights] = None, progress: bool = True, **kwargs: Any) -> ResNet:
     """ResNeXt-101 32x8d model from
     `Aggregated Residual Transformation for Deep Neural Networks <https://arxiv.org/abs/1611.05431>`_.
 
@@ -854,9 +994,7 @@ def resnext101_32x8d(
 
 #@register_model()
 @handle_legacy_interface(weights=("pretrained", ResNeXt101_64X4D_Weights.IMAGENET1K_V1))
-def resnext101_64x4d(
-    *, weights: Optional[ResNeXt101_64X4D_Weights] = None, progress: bool = True, **kwargs: Any
-) -> ResNet:
+def resnext101_64x4d(*, weights: Optional[ResNeXt101_64X4D_Weights] = None, progress: bool = True, **kwargs: Any) -> ResNet:
     """ResNeXt-101 64x4d model from
     `Aggregated Residual Transformation for Deep Neural Networks <https://arxiv.org/abs/1611.05431>`_.
 
@@ -884,9 +1022,7 @@ def resnext101_64x4d(
 
 #@register_model()
 @handle_legacy_interface(weights=("pretrained", Wide_ResNet50_2_Weights.IMAGENET1K_V1))
-def wide_resnet50_2(
-    *, weights: Optional[Wide_ResNet50_2_Weights] = None, progress: bool = True, **kwargs: Any
-) -> ResNet:
+def wide_resnet50_2(*, weights: Optional[Wide_ResNet50_2_Weights] = None, progress: bool = True, **kwargs: Any) -> ResNet:
     """Wide ResNet-50-2 model from
     `Wide Residual Networks <https://arxiv.org/abs/1605.07146>`_.
 
@@ -918,9 +1054,7 @@ def wide_resnet50_2(
 
 #@register_model()
 @handle_legacy_interface(weights=("pretrained", Wide_ResNet101_2_Weights.IMAGENET1K_V1))
-def wide_resnet101_2(
-    *, weights: Optional[Wide_ResNet101_2_Weights] = None, progress: bool = True, **kwargs: Any
-) -> ResNet:
+def wide_resnet101_2(*, weights: Optional[Wide_ResNet101_2_Weights] = None, progress: bool = True, **kwargs: Any) -> ResNet:
     """Wide ResNet-101-2 model from
     `Wide Residual Networks <https://arxiv.org/abs/1605.07146>`_.
 
@@ -967,3 +1101,82 @@ model_urls = _ModelURLs(
         "wide_resnet101_2": Wide_ResNet101_2_Weights.IMAGENET1K_V1.url,
     }
 )
+
+
+model_urls2 = {
+    'resnet18'  :    'https://download.pytorch.org/models/resnet18-f37072fd.pth',
+    'resnet34'  :    'https://download.pytorch.org/models/resnet34-b627a593.pth',
+    'resnet50'  :    'https://download.pytorch.org/models/resnet50-11ad3fa6.pth',
+    'resnet101' :    'https://download.pytorch.org/models/resnet101-cd907fc2.pth',
+    'resnet152' :    'https://download.pytorch.org/models/resnet152-f82ba261.pth',
+}
+
+
+def resnet18_cbam(pretrained=False, **kwargs):
+    """Constructs a ResNet-18 model.
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+    """
+    model = ResNet(BasicBlock, [2, 2, 2, 2], **kwargs)
+    if pretrained:
+        pretrained_state_dict = model_zoo.load_url(model_urls2['resnet18'])
+        now_state_dict        = model.state_dict()
+        now_state_dict.update(pretrained_state_dict)
+        model.load_state_dict(now_state_dict)
+    return model
+
+
+def resnet34_cbam(pretrained=False, **kwargs):
+    """Constructs a ResNet-34 model.
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+    """
+    model = ResNet(BasicBlock, [3, 4, 6, 3], **kwargs)
+    if pretrained:
+        pretrained_state_dict = model_zoo.load_url(model_urls2['resnet34'])
+        now_state_dict        = model.state_dict()
+        now_state_dict.update(pretrained_state_dict)
+        model.load_state_dict(now_state_dict)
+    return model
+
+
+def resnet50_cbam(pretrained=False, **kwargs):
+    """Constructs a ResNet-50 model.
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+    """
+    model = ResNet(Bottleneck, [3, 4, 6, 3], **kwargs)
+    if pretrained:
+        pretrained_state_dict = model_zoo.load_url(model_urls2['resnet50'])
+        now_state_dict        = model.state_dict()
+        now_state_dict.update(pretrained_state_dict)
+        model.load_state_dict(now_state_dict)
+    return model
+
+
+def resnet101_cbam(pretrained=False, **kwargs):
+    """Constructs a ResNet-101 model.
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+    """
+    model = ResNet(Bottleneck, [3, 4, 23, 3], **kwargs)
+    if pretrained:
+        pretrained_state_dict = model_zoo.load_url(model_urls2['resnet101'])
+        now_state_dict        = model.state_dict()
+        now_state_dict.update(pretrained_state_dict)
+        model.load_state_dict(now_state_dict)
+    return model
+
+
+def resnet152_cbam(pretrained=False, **kwargs):
+    """Constructs a ResNet-152 model.
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+    """
+    model = ResNet(Bottleneck, [3, 8, 36, 3], **kwargs)
+    if pretrained:
+        pretrained_state_dict = model_zoo.load_url(model_urls2['resnet152'])
+        now_state_dict        = model.state_dict()
+        now_state_dict.update(pretrained_state_dict)
+        model.load_state_dict(now_state_dict)
+    return model

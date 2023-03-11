@@ -11,7 +11,8 @@ class ResNet18_MultiheadAttention(nn.Module):
 
         hidden_size1 = 256
 
-        feature_extractor = models.resnet.resnet18(weights=models.ResNet18_Weights.DEFAULT)
+        #feature_extractor = models.resnet.resnet18(weights=models.ResNet18_Weights.DEFAULT)
+        feature_extractor = models.resnet.resnet18(weights=None)
 
         feature_extractor.fc = (
             nn.Linear(512, hidden_size1) if hidden_size1 != 512 else nn.Identity()
