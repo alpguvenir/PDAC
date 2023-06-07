@@ -1,3 +1,14 @@
+# type: ignore
+# pylint: disable=missing-module-docstring
+# pylint: disable=missing-class-docstring
+# pylint: disable=missing-function-docstring
+# pylint: disable=invalid-name
+# pylint: disable=unnecessary-lambda-assignment
+# pylint: disable=no-member
+# pylint: disable=trailing-whitespace
+# pylint: disable=unused-import
+# pylint: disable=unused-variable
+
 import torch
 import torch.nn as nn
 from torchvision import models
