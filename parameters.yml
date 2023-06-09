@@ -4,17 +4,26 @@ cst.label.csv: /home/guevenira/Data/shared/PDAC_CT/pseudonymised_patient_info.cs
 cts.label.problematic: /home/guevenira/Data/shared/Problematic_CTs
 
 radimagenet.directory: /home/guevenira/Data/shared/radiology_ai/CT/abd
+normalpancreas.directory: /home/guevenira/Data/shared/NormalPancreas/normal_selected 
 
+########################################################################
+
+# This dataset has PDAC CTs as 1 and NormalPancreas as 0
+# 75% train, 10% validation, 15% test
+#data.label.name: PDAC_bool
+#data.label.name.version: pdac_bool_v1    
+
+########################################################################
 
 #data.label.name: Radimagenet
 #data.label.name.version: radimagenet_v1    # onehot encoded
-#data.label.name.version: radimagenet_v2     # class index 
+#data.label.name.version: radimagenet_v3     # class index 
 
 ########################################################################
 
 # 80% train, 10% validation, 10% test
-#data.label.name: Geschlecht
-#data.label.name.version: geschlecht_v1
+data.label.name: Geschlecht
+data.label.name.version: geschlecht_v1
 
 # DONT FORGET
 #'Crop-Height' : {'begin': 0, 'end': 256}
@@ -23,7 +32,7 @@ radimagenet.directory: /home/guevenira/Data/shared/radiology_ai/CT/abd
 
 ########################################################################
 
-data.label.name: Befund-Verlauf
+#data.label.name: Befund-Verlauf
 # 80% train, 10% validation, 10% test
 #data.label.name.version: befund_verlauf_v1
 
@@ -31,12 +40,24 @@ data.label.name: Befund-Verlauf
 #data.label.name.version: befund_verlauf_v2
 
 # 75% train, 10% validation, 15% test
-data.label.name.version: befund_verlauf_v3
+#data.label.name.version: befund_verlauf_v3
+
+# 20% each set
+#data.label.name.version: befund_verlauf_v4
+
+# 75% train, 10% validation, 15% test
+# SIMILAT TO BEFUND VERLAUF V3
+#data.label.name.version: befund_verlauf_v5
 
 # IF RESNET 152 DONT FORGET
 #'Crop-Height' : {'begin': 16, 'end': 240}
 #'Crop-Width' : {'begin': 16, 'end': 240}
 #'Max-Layers' : {'max': 110}
+
+
+#data.label.name: EPDAC
+#data.label.name.version: epdac_v1
+
 
 ########################################################################
 
@@ -51,9 +72,9 @@ data.augmentation: False
 data.augmentation.clip_threshold: 1
 data.augmentation.horizontal_flip_threshold: 1
 data.augmentation.vertical_flip_threshold: 1
-data.augmentation.translation_threshold: 0.8
+data.augmentation.translation_threshold: 0.9
 data.augmentation.shear_threshold: 1
 data.augmentation.rotation_threshold: 1
-data.augmentation.gaussian_blur_threshold: 1                    # this is gaussian blur
-data.augmentation.gaussian_threshold: 1                         # this is gaussian noise
+data.augmentation.gaussian_blur_threshold: 0.9                    # this is gaussian blur
+data.augmentation.gaussian_threshold: 0.9                         # this is gaussian noise
 data.augmentation.brightness_contrast_sharpness_threshold: 1
