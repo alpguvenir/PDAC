@@ -204,7 +204,7 @@ class Dataset(torch.utils.data.Dataset):
         # Transformations for gaussian noise
         mean = 0
         variance = 0.05
-        noise = np.random.normal(mean, variance, [crop_height_end - crop_height_begin, crop_width_end - crop_width_begin]) 
+        noise = np.random.normal(mean, variance, [crop_height_end - crop_height_begin, crop_width_end - crop_width_begin])
         ########################################################
 
         ct_instance_tensor = []
